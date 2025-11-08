@@ -5,51 +5,75 @@ import { useState, useEffect } from 'react';
 import philippineCitiesAndProvinces from '../../../../../../public/philippines-locations.json';
 import RichTextEditor from '@/lib/components/CareerComponents/RichTextEditor';
 
-export default function CareerDetailsForm({career}: {career?: any}) {
-
-    const [country, setCountry] = useState(career?.country || "Philippines");
-    const [employmentType, setEmploymentType] = useState(career?.employmentType || "Full-Time");
-    const [province, setProvince] = useState(career?.province ||"");
-    const [city, setCity] = useState(career?.location || "");
+export default function CareerDetailsForm({
+    career,
+    jobTitle,
+    setJobTitle,
+    description,
+    setDescription,
+    employmentType,
+    setEmploymentType,
+    workSetup,
+    setWorkSetup,
+    workSetupRemarks,
+    setWorkSetupRemarks,
+    country,
+    setCountry,
+    province,
+    setProvince,
+    city,
+    setCity,
+    salaryNegotiable,
+    setSalaryNegotiable,
+    minimumSalary,
+    setMinimumSalary,
+    maximumSalary,
+    setMaximumSalary,
+}: {
+    career?: any;
+    jobTitle: string;
+    setJobTitle: (val: string) => void;
+    description: string;
+    setDescription: (val: string) => void;
+    employmentType: string;
+    setEmploymentType: (val: string) => void;
+    workSetup: string;
+    setWorkSetup: (val: string) => void;
+    workSetupRemarks: string;
+    setWorkSetupRemarks: (val: string) => void;
+    country: string;
+    setCountry: (val: string) => void;
+    province: string;
+    setProvince: (val: string) => void;
+    city: string;
+    setCity: (val: string) => void;
+    salaryNegotiable: boolean;
+    setSalaryNegotiable: (val: boolean) => void;
+    minimumSalary: string;
+    setMinimumSalary: (val: string) => void;
+    maximumSalary: string;
+    setMaximumSalary: (val: string) => void;
+}) {
+    // Only keep local state for province and city lists
     const [provinceList, setProvinceList] = useState([]);
     const [cityList, setCityList] = useState([]);
-    const [workSetup, setWorkSetup] = useState(career?.workSetup || "");
-    const [salaryNegotiable, setSalaryNegotiable] = useState(career?.salaryNegotiable || false);
-    const [minimumSalary, setMinimumSalary] = useState(career?.minimumSalary || "");
-    const [maximumSalary, setMaximumSalary] = useState(career?.maximumSalary || "");
-    const [description, setDescription] = useState(career?.description || "");
 
     // Add this useEffect to initialize the lists
     useEffect(() => {
         const parseProvinces = () => {
           setProvinceList(philippineCitiesAndProvinces.provinces);
           const defaultProvince = philippineCitiesAndProvinces.provinces[0];
-          if (!career?.province) {
+          if (!province) {
             setProvince(defaultProvince.name);
           }
-          const cities = philippineCitiesAndProvinces.cities.filter((city) => city.province === defaultProvince.key);
+          const cities = philippineCitiesAndProvinces.cities.filter((cityItem) => cityItem.province === defaultProvince.key);
           setCityList(cities);
-          if (!career?.location) {
+          if (!city) {
             setCity(cities[0].name);
           }
         }
         parseProvinces();
-    }, [career])
-
-    const screeningSettingList = [
-        {
-            name: "Good Fit and above",
-            icon: "la la-check",
-        },
-        {
-            name: "Only Strong Fit",
-            icon: "la la-check-double",
-        },
-        {
-            name: "No Automatic Promotion",
-            icon: "la la-times",
-        },
-    ];
+    }, [])
 
     const employmentTypeOptions = [
         {
@@ -87,21 +111,21 @@ export default function CareerDetailsForm({career}: {career?: any}) {
                             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                     <span>Job Title</span>
                                     <input
-                                    //   value={jobTitle}
-                                    className="form-control"
-                                    placeholder="Enter job title"
-                                    //   onChange={(e) => {
-                                    //       setJobTitle(e.target.value || "");
-                                    //   }}
-                                    ></input>
+                                      value={jobTitle}
+                                      className="form-control"
+                                      placeholder="Enter job title"
+                                      onChange={(e) => {
+                                          setJobTitle(e.target.value || "");
+                                      }}
+                                    />
                                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                         <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>Work Setting</span>
                                         <div style={{ display: "flex", flexDirection: "row", gap: 8 }}>
                                             <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
                                                 <span>Employment Type</span>
                                                 <CustomDropdown
-                                                    onSelectSetting={(employmentType) => {
-                                                        setEmploymentType(employmentType);
+                                                    onSelectSetting={(type) => {
+                                                        setEmploymentType(type);
                                                     }}
                                                     screeningSetting={employmentType}
                                                     settingList={employmentTypeOptions}
@@ -129,7 +153,7 @@ export default function CareerDetailsForm({career}: {career?: any}) {
                                                 <CustomDropdown
                                                     onSelectSetting={(setting) => {
                                                         setCountry(setting);
-                                                }}
+                                                    }}
                                                     screeningSetting={country}
                                                     settingList={[]}
                                                     placeholder="Select Country"
@@ -138,10 +162,10 @@ export default function CareerDetailsForm({career}: {career?: any}) {
                                             <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
                                                 <span>State / Province</span>
                                                 <CustomDropdown
-                                                    onSelectSetting={(province) => {
-                                                        setProvince(province);
-                                                        const provinceObj = provinceList.find((p) => p.name === province);
-                                                        const cities = philippineCitiesAndProvinces.cities.filter((city) => city.province === provinceObj.key);
+                                                    onSelectSetting={(prov) => {
+                                                        setProvince(prov);
+                                                        const provinceObj = provinceList.find((p) => p.name === prov);
+                                                        const cities = philippineCitiesAndProvinces.cities.filter((cityItem) => cityItem.province === provinceObj.key);
                                                         setCityList(cities);
                                                         setCity(cities[0].name);
                                                     }}
@@ -153,8 +177,8 @@ export default function CareerDetailsForm({career}: {career?: any}) {
                                             <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
                                                 <span>City</span>
                                                 <CustomDropdown
-                                                    onSelectSetting={(city) => {
-                                                        setCity(city);
+                                                    onSelectSetting={(selectedCity) => {
+                                                        setCity(selectedCity);
                                                     }}
                                                     screeningSetting={city}
                                                     settingList={cityList}

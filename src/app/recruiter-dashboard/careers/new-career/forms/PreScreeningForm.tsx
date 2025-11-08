@@ -2,10 +2,24 @@
 import CustomDropdown from '@/lib/components/CareerComponents/CustomDropdown';
 import React, { useState } from 'react';
 
-export default function PreScreeningForm({career}: {career?: any}) {
-    const [screeningSetting, setScreeningSetting] = useState(career?.screeningSetting || "Good Fit and above");
-    const [secretPrompt, setSecretPrompt] = useState(career?.secretPrompt || "");
-    const [preScreeningQuestions, setPreScreeningQuestions] = useState(career?.preScreeningQuestions || []);
+export default function PreScreeningForm({
+    career,
+    screeningSetting,
+    setScreeningSetting,
+    secretPrompt,
+    setSecretPrompt,
+    preScreeningQuestions,
+    setPreScreeningQuestions,
+}: {
+    career?: any;
+    screeningSetting: string;
+    setScreeningSetting: (val: string) => void;
+    secretPrompt: string;
+    setSecretPrompt: (val: string) => void;
+    preScreeningQuestions: any[];
+    setPreScreeningQuestions: (val: any[]) => void;
+}) {
+    // Remove duplicate state declarations - only keep modal states
     const [showAddCustomModal, setShowAddCustomModal] = useState(false);
     const [editingQuestion, setEditingQuestion] = useState(null);
 

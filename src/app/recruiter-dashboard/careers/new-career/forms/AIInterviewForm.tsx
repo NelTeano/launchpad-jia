@@ -3,41 +3,27 @@ import CustomDropdown from '@/lib/components/CareerComponents/CustomDropdown';
 import InterviewQuestionGeneratorV2 from '@/lib/components/CareerComponents/InterviewQuestionGeneratorV2';
 import React, { useState } from 'react';
 
-export default function AIInterviewSetupForm({career, jobTitle, description}: {career?: any, jobTitle?: string, description?: string}) {
-    const [screeningSetting, setScreeningSetting] = useState(career?.interviewScreeningSetting || "Good Fit and above");
-    const [requireVideo, setRequireVideo] = useState(career?.requireVideo || true);
-    const [questions, setQuestions] = useState(career?.interviewQuestions || [
-          {
-            id: 1,
-            category: "CV Validation / Experience",
-            questionCountToAsk: null,
-            questions: [],
-          },
-          {
-            id: 2,
-            category: "Technical",
-            questionCountToAsk: null,
-            questions: [],
-          },
-          {
-            id: 3,
-            category: "Behavioral",
-            questionCountToAsk: null,
-            questions: [],
-          },
-          {
-            id: 4,
-            category: "Analytical",
-            questionCountToAsk: null,
-            questions: [],
-          },
-          {
-            id: 5,
-            category: "Others",
-            questionCountToAsk: null,
-            questions: [],
-          },
-    ]);
+export default function AIInterviewSetupForm({
+    career,
+    jobTitle,
+    description,
+    screeningSetting,
+    setScreeningSetting,
+    requireVideo,
+    setRequireVideo,
+    questions,
+    setQuestions,
+}: {
+    career?: any;
+    jobTitle?: string;
+    description?: string;
+    screeningSetting: string;
+    setScreeningSetting: (val: string) => void;
+    requireVideo: boolean;
+    setRequireVideo: (val: boolean) => void;
+    questions: any[];
+    setQuestions: (val: any[]) => void;
+}) {
     
     const screeningSettingList = [
         {
