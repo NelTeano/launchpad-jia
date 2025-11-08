@@ -1,5 +1,5 @@
 // TODO (Job Portal) - Check API
-
+// Upload CV Component with Pre-Screening Questions and AI Screening
 "use client";
 
 import Loader from "@/lib/components/commonV2/Loader";
@@ -12,7 +12,7 @@ import axios from "axios";
 import Markdown from "react-markdown";
 import { useEffect, useRef, useState } from "react";
 
-export default function () {
+export default function UploadCVWithPreScreening() {
   const fileInputRef = useRef(null);
   const { user, setModalType } = useAppContext();
   const [buildingCV, setBuildingCV] = useState(false);
@@ -25,6 +25,9 @@ export default function () {
   const [interview, setInterview] = useState(null);
   const [screeningResult, setScreeningResult] = useState(null);
   const [userCV, setUserCV] = useState(null);
+  const [preScreeningAnswers, setPreScreeningAnswers] = useState({});
+  const [aiScreeningResult, setAiScreeningResult] = useState(null);
+  
   const cvSections = [
     "Introduction",
     "Current Position",
@@ -36,7 +39,14 @@ export default function () {
     "Certifications",
     "Awards",
   ];
-  const step = ["Submit CV", "CV Screening", "Review Next Steps"];
+  
+  const step = [
+    "Submit CV",
+    "CV Screening",
+    "Pre-Screening Questions",
+    "AI Screening",
+    "Review Next Steps"
+  ];
   const stepStatus = ["Completed", "Pending", "In Progress"];
 
   function handleDragOver(e) {
@@ -127,6 +137,26 @@ export default function () {
     fileInputRef.current.click();
   }
 
+  // Pre-screening answer handlers
+  function handlePreScreeningAnswer(questionId, value) {
+    setPreScreeningAnswers(prev => ({
+      ...prev,
+      [questionId]: value
+    }));
+  }
+
+  function handleMultipleChoiceToggle(questionId, answerId) {
+    const current = preScreeningAnswers[questionId] || [];
+    const newValue = current.includes(answerId)
+      ? current.filter(id => id !== answerId)
+      : [...current, answerId];
+    
+    setPreScreeningAnswers(prev => ({
+      ...prev,
+      [questionId]: newValue
+    }));
+  }
+
   function processState(index, isAdvance = false) {
     const currentStepIndex = step.indexOf(currentStep);
 
@@ -196,7 +226,7 @@ export default function () {
       });
   }
 
-  function handleCVScreen() {
+  async function handleCVScreen() {
     if (editingCV != null) {
       alert("Please save the changes first.");
       return false;
@@ -253,7 +283,7 @@ export default function () {
         };
       }
 
-      axios({
+      await axios({
         method: "POST",
         url: `/api/whitecloak/save-cv`,
         data,
@@ -273,7 +303,7 @@ export default function () {
 
     setHasChanges(true);
 
-    axios({
+    await axios({
       url: "/api/whitecloak/screen-cv",
       method: "POST",
       data: {
@@ -288,8 +318,14 @@ export default function () {
           alert(result.message);
           setCurrentStep(step[0]);
         } else {
-          setCurrentStep(step[2]);
           setScreeningResult(result);
+          
+          // Check if there are pre-screening questions
+          if (interview.preScreeningQuestions && interview.preScreeningQuestions.length > 0) {
+            setCurrentStep(step[2]); // Move to Pre-Screening Questions
+          } else {
+            setCurrentStep(step[4]); // Skip to Review Next Steps
+          }
         }
       })
       .catch((err) => {
@@ -300,6 +336,49 @@ export default function () {
       .finally(() => {
         setHasChanges(false);
       });
+  }
+
+  async function handleSubmitPreScreening() {
+    // Validate all questions are answered
+    const unanswered = interview.preScreeningQuestions.filter(q => {
+      const answer = preScreeningAnswers[q.id];
+      return !answer || (Array.isArray(answer) && answer.length === 0) || answer === "";
+    });
+
+    if (unanswered.length > 0) {
+      alert("Please answer all questions before proceeding.");
+      return;
+    }
+
+    setCurrentStep(step[3]); // Move to AI Screening
+
+    // Call AI screening API
+    try {
+      const response = await axios({
+        method: "POST",
+        url: "/api/whitecloak/ai-screening",
+        data: {
+          interviewID: interview.interviewID,
+          userEmail: user.email,
+          preScreeningAnswers: preScreeningAnswers
+        }
+      });
+
+      const result = response.data;
+      
+      if (result.error) {
+        alert(result.message);
+        setCurrentStep(step[2]);
+        return;
+      }
+
+      setAiScreeningResult(result);
+      setCurrentStep(step[4]); // Move to Review Next Steps
+    } catch (error) {
+      console.error("AI Screening error:", error);
+      alert("Error during AI screening. Please try again.");
+      setCurrentStep(step[2]);
+    }
   }
 
   function handleFileSubmit(file) {
@@ -348,6 +427,131 @@ export default function () {
         setBuildingCV(false);
         console.log(err);
       });
+  }
+
+  function renderPreScreeningQuestion(question) {
+    const answer = preScreeningAnswers[question.id];
+
+    switch (question.questionFormat) {
+      case "Dropdown":
+        return (
+          <select
+            value={answer || ""}
+            onChange={(e) => handlePreScreeningAnswer(question.id, e.target.value)}
+            className="form-control"
+            style={{ width: "100%", padding: "12px", borderRadius: "8px" }}
+          >
+            <option value="">Select an option</option>
+            {question.answers?.map(ans => (
+              <option key={ans.id} value={ans.value}>{ans.value}</option>
+            ))}
+          </select>
+        );
+
+      case "Range":
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <input
+              type="range"
+              min={question.minValue}
+              max={question.maxValue}
+              value={answer || question.minValue}
+              onChange={(e) => handlePreScreeningAnswer(question.id, e.target.value)}
+              style={{ width: "100%" }}
+            />
+            <div style={{ textAlign: "center", fontSize: 18, fontWeight: 600, color: "#5E72E4" }}>
+              {answer || question.minValue} {question.rangeUnit}
+            </div>
+          </div>
+        );
+
+      case "Yes/No":
+        return (
+          <div style={{ display: "flex", gap: 12 }}>
+            {["Yes", "No"].map(option => (
+              <button
+                key={option}
+                onClick={() => handlePreScreeningAnswer(question.id, option)}
+                style={{
+                  flex: 1,
+                  padding: "12px 24px",
+                  borderRadius: 8,
+                  border: answer === option ? "2px solid #5E72E4" : "2px solid #E9EAEB",
+                  backgroundColor: answer === option ? "#5E72E4" : "#fff",
+                  color: answer === option ? "#fff" : "#181D27",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.3s"
+                }}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        );
+
+      case "Multiple Choice":
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {question.answers?.map(ans => {
+              const isSelected = (answer || []).includes(ans.id);
+              return (
+                <button
+                  key={ans.id}
+                  onClick={() => handleMultipleChoiceToggle(question.id, ans.id)}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "12px 16px",
+                    borderRadius: 8,
+                    border: isSelected ? "2px solid #5E72E4" : "2px solid #E9EAEB",
+                    backgroundColor: isSelected ? "#F0F3FF" : "#fff",
+                    color: "#181D27",
+                    cursor: "pointer",
+                    transition: "all 0.3s",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12
+                  }}
+                >
+                  <div style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 4,
+                    border: isSelected ? "2px solid #5E72E4" : "2px solid #D5D7DA",
+                    backgroundColor: isSelected ? "#5E72E4" : "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                  }}>
+                    {isSelected && (
+                      <svg width="12" height="12" viewBox="0 0 20 20" fill="white">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                  <span style={{ fontWeight: 500 }}>{ans.value}</span>
+                </button>
+              );
+            })}
+          </div>
+        );
+
+      case "Text":
+        return (
+          <textarea
+            value={answer || ""}
+            onChange={(e) => handlePreScreeningAnswer(question.id, e.target.value)}
+            placeholder="Type your answer here..."
+            rows={4}
+            className="form-control"
+            style={{ resize: "vertical", width: "100%", padding: "12px", borderRadius: "8px" }}
+          />
+        );
+
+      default:
+        return null;
+    }
   }
 
   return (
@@ -417,6 +621,7 @@ export default function () {
             </div>
           </div>
 
+          {/* STEP 1: Submit CV */}
           {currentStep == step[0] && (
             <>
               {!buildingCV && !userCV && !file && (
@@ -608,6 +813,7 @@ export default function () {
             </>
           )}
 
+          {/* STEP 2: CV Screening */}
           {currentStep == step[1] && (
             <div className={styles.cvScreeningContainer}>
               <img alt="" src={assetConstants.loading} />
@@ -621,16 +827,96 @@ export default function () {
             </div>
           )}
 
-          {currentStep == step[2] && screeningResult && (
+          {/* STEP 3: Pre-Screening Questions */}
+          {currentStep == step[2] && interview.preScreeningQuestions && (
+            <div className={styles.cvDetailsContainer}>
+              <div className={styles.gradient}>
+                <div className={styles.cvDetailsCard}>
+                  <span className={styles.sectionTitle}>
+                    <img alt="" src={assetConstants.account} />
+                    Pre-Screening Questions
+                  </span>
+                  <div className={styles.detailsContainer}>
+                    <span className={styles.description} style={{ marginBottom: 16 }}>
+                      Please answer the following questions to help us better understand your qualifications.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {interview.preScreeningQuestions.map((question, index) => (
+                <div key={question.id} className={styles.gradient}>
+                  <div className={styles.cvDetailsCard}>
+                    <span className={styles.sectionTitle}>
+                      {index + 1}. {question.question}
+                      <span style={{ color: "#dc3545", marginLeft: 4 }}>*</span>
+                    </span>
+                    <div className={styles.detailsContainer}>
+                      {renderPreScreeningQuestion(question)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <button onClick={handleSubmitPreScreening}>
+                Submit Answers
+              </button>
+            </div>
+          )}
+
+          {/* STEP 4: AI Screening */}
+          {currentStep == step[3] && (
+            <div className={styles.cvScreeningContainer}>
+              <img alt="" src={assetConstants.loading} />
+              <span className={styles.title}>Analyzing your responses!</span>
+              <span className={styles.description}>
+                Our AI is evaluating your answers to determine the best fit.
+              </span>
+              <span className={styles.description}>
+                This will only take a moment.
+              </span>
+            </div>
+          )}
+
+          {/* STEP 5: Review Next Steps */}
+          {currentStep == step[4] && (
             <div className={styles.cvResultContainer}>
-              {screeningResult.applicationStatus == "Dropped" ? (
+              {aiScreeningResult && aiScreeningResult.status == "For Human Interview" ? (
+                <>
+                  <img alt="" src={assetConstants.checkV3} />
+                  <span className={styles.title}>
+                    Congratulations! You're a strong match for this role.
+                  </span>
+                  <span className={styles.description}>
+                    Based on your CV and responses, you're an excellent fit for this position.
+                  </span>
+                  <br />
+                  <span className={`${styles.description} ${styles.bold}`}>
+                    Ready to take the next step?
+                  </span>
+                  <span className={styles.description}>
+                    Proceed to the human interview stage.
+                  </span>
+                  <div className={styles.buttonContainer}>
+                    <button onClick={() => handleRedirection("interview")}>
+                      Continue to Interview
+                    </button>
+                    <button
+                      className="secondaryBtn"
+                      onClick={() => handleRedirection("dashboard")}
+                    >
+                      View Dashboard
+                    </button>
+                  </div>
+                </>
+              ) : screeningResult && screeningResult.applicationStatus == "Dropped" ? (
                 <>
                   <img alt="" src={assetConstants.userRejected} />
                   <span className={styles.title}>
                     This role may not be the best match.
                   </span>
                   <span className={styles.description}>
-                    Based on your CV, it looks like this position might not be
+                    Based on your CV and responses, it looks like this position might not be
                     the right fit at the moment.
                   </span>
                   <br />
@@ -644,42 +930,14 @@ export default function () {
                     </button>
                   </div>
                 </>
-              ) : screeningResult.status == "For AI Interview" ? (
-                <>
-                  <img alt="" src={assetConstants.checkV3} />
-                  <span className={styles.title}>
-                    Hooray! You’re a strong fit for this role.
-                  </span>
-                  <span className={styles.description}>
-                    Jia thinks you might be a great match.
-                  </span>
-                  <br />
-                  <span className={`${styles.description} ${styles.bold}`}>
-                    Ready to take the next step?
-                  </span>
-                  <span className={styles.description}>
-                    You may start your AI interview now.
-                  </span>
-                  <div className={styles.buttonContainer}>
-                    <button onClick={() => handleRedirection("interview")}>
-                      Start AI Interview
-                    </button>
-                    <button
-                      className="secondaryBtn"
-                      onClick={() => handleRedirection("dashboard")}
-                    >
-                      View Dashboard
-                    </button>
-                  </div>
-                </>
               ) : (
                 <>
                   <img alt="" src={assetConstants.userCheck} />
                   <span className={styles.title}>
-                    Your CV is now being reviewed by the hiring team.
+                    Your application is now being reviewed by the hiring team.
                   </span>
                   <span className={styles.description}>
-                    We’ll be in touch soon with updates about your application.
+                    We'll be in touch soon with updates about your application.
                   </span>
                   <div className={styles.buttonContainer}>
                     <button onClick={() => handleRedirection("dashboard")}>
@@ -690,8 +948,8 @@ export default function () {
               )}
             </div>
           )}
-        </div>
-      )}
-    </>
-  );
-}
+              </div>
+            )}
+          </>
+        );
+      }

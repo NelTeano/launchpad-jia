@@ -1,102 +1,320 @@
+// app/api/whitecloak/ai-screening/route.ts
 import { NextResponse } from "next/server";
 import connectMongoDB from "@/lib/mongoDB/mongoDB";
-import { sendEmail } from "@/lib/Email";
+import OpenAI from "openai";
+import { ObjectId } from "mongodb";
 
 export async function POST(request: Request) {
+  const { interviewID, userEmail, preScreeningAnswers } = await request.json();
+  const { db } = await connectMongoDB();
+  
+  const interviewData = await db.collection("interviews").findOne({
+    interviewID,
+    email: userEmail,
+  });
+
+  if (!interviewData) {
+    return NextResponse.json({
+      error: "AI Screening Failed",
+      message: "No application found for the selected job.",
+    });
+  }
+
+  // Get CV data
+  const cvData = await db.collection("applicant-cv").findOne({
+    email: userEmail,
+  });
+
+  if (!cvData) {
+    return NextResponse.json({
+      error: "AI Screening Failed",
+      message: "You have not uploaded a CV for this application.",
+    });
+  }
+
+  // Format CV
+  let parsedCV = "";
+  cvData.digitalCV.forEach((section) => {
+    parsedCV += `${section.name}\n${section.content}\n\n`;
+  });
+
+  // Format pre-screening answers
+  let formattedAnswers = "";
+  interviewData.preScreeningQuestions.forEach((question) => {
+    const answer = preScreeningAnswers[question.id];
+    let answerText = "";
+
+    if (question.questionFormat === "Multiple Choice" && Array.isArray(answer)) {
+      const selectedOptions = question.answers
+        .filter(a => answer.includes(a.id))
+        .map(a => a.value);
+      answerText = selectedOptions.join(", ");
+    } else if (question.questionFormat === "Dropdown") {
+      answerText = answer;
+    } else if (question.questionFormat === "Range") {
+      answerText = `${answer} ${question.rangeUnit || ""}`;
+    } else {
+      answerText = answer;
+    }
+
+    formattedAnswers += `Q: ${question.question}\nA: ${answerText}\n\n`;
+  });
+
+  // Get AI screening prompt from settings
+  const aiScreeningPromptData = await db.collection("global-settings").findOne(
+    {
+      name: "global-settings",
+    },
+    {
+      projection: {
+        ai_screening_prompt: 1,
+      },
+    }
+  );
+  const aiScreeningPromptText =
+    aiScreeningPromptData?.ai_screening_prompt?.prompt || 
+    `Analyze the candidate's responses to determine if they are a good fit for the role. 
+     Consider their answers in the context of the job requirements.
+     Evaluate their alignment with role expectations, work preferences, and qualifications.`;
+
+  const screeningPrompt = `
+    You are a helpful AI assistant conducting pre-screening assessment.
+    You are given a candidate's CV, their pre-screening question responses, and a job description.
+    You need to evaluate if they are a good fit for the job based on both their CV and their answers.
+
+    Job Details:
+      Job Title: ${interviewData.jobTitle}
+      Job Description: ${interviewData.description}
+      Work Setup: ${interviewData.workSetup}
+      Location: ${interviewData.location}
+      Employment Type: ${interviewData.employmentType}
+      Salary Range: ${interviewData.minimumSalary} - ${interviewData.maximumSalary} PHP
+
+    Applicant Information:
+      Name: ${interviewData.name}
+      Email: ${userEmail}
+
+    Applicant CV:
+      ${parsedCV}
+
+    Pre-Screening Questions & Answers:
+      ${formattedAnswers}
+
+    ${interviewData.secretPrompt ? `Additional Evaluation Criteria:\n${interviewData.secretPrompt}\n` : ''}
+
+    Processing Instructions:
+      ${aiScreeningPromptText}
+
+    - Carefully analyze both the CV and the pre-screening answers
+    - Consider how their answers align with job requirements
+    - Evaluate work setup preferences, availability, and expectations
+    - Assess technical skills and experience from CV
+    - Check for any deal-breakers or misalignments
+
+    - Format your response as JSON:
+      {
+        "result": <Result (No Fit / Bad Fit / Good Fit / Strong Fit / Insufficient Data)>,
+        "reason": <Detailed reason for the assessment>,
+        "confidence": <AI Assessment Confidence (0-100)>,
+        "jobFitScore": <Overall Score (0-100)>,
+        "keyStrengths": [<Array of key strengths>],
+        "concerns": [<Array of concerns or gaps>]
+      }
+
+    Processing Instructions:
+      - Return only the JSON, nothing else
+      - Be thorough and specific in your reasoning
+      - Set result to "Strong Fit" only for candidates who excel in both CV and answers
+      - Set result to "Good Fit" for candidates who meet requirements well
+      - Set result to "Bad Fit" or "No Fit" for clear mismatches
+      - Set result to "Insufficient Data" if critical information is missing
+      - DO NOT include \`\`\`json or \`\`\` around the response
+  `;
+
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "user",
+        content: screeningPrompt,
+      },
+    ],
+  });
+
+  let result: any = completion.choices[0].message.content;
+
   try {
-    let jobApplicationData = await request.json();
+    result = result.replace(/```json/g, "").replace(/```/g, "").trim();
+    result = JSON.parse(result);
+  } catch (error) {
+    console.log("JSON Parse Error:", error);
+    return NextResponse.json({
+      error: "AI Screening Failed",
+      message: "Invalid response from AI screening.",
+    });
+  }
 
-    const { jobTitle, description, questions, name, email, status, origin } =
-      jobApplicationData;
+  // Prepare screening data
+  let screeningData: any = {
+    aiStatus: result.result,
+    aiScreeningReason: result.reason,
+    aiConfidence: result.confidence,
+    aiJobFitScore: result.jobFitScore,
+    aiKeyStrengths: result.keyStrengths || [],
+    aiConcerns: result.concerns || [],
+    preScreeningAnswers: preScreeningAnswers,
+    updatedAt: Date.now(),
+  };
 
-    // Validate required fields
-    if (!jobTitle || !description || !questions || !name || !email) {
-      return NextResponse.json(
-        { error: "Job title, description and questions are required" },
-        { status: 400 }
-      );
-    }
+  const newDate = new Date();
 
-    const { db } = await connectMongoDB();
+  // Determine next step based on AI screening result
+  const forReviewResult = ["Maybe Fit", "Insufficient Data", "Good Fit", "Bad Fit", "No Fit"];
+  const forHumanInterviewResult = ["Strong Fit"];
 
-    const interviewData = {
-      ...jobApplicationData,
-      reviewers: [],
+  let interviewTransaction: any = null;
+
+  if (forHumanInterviewResult.includes(result.result)) {
+    // Strong Fit - Move to Human Interview
+    screeningData.currentStep = "Human Interview";
+    screeningData.status = "For Human Interview";
+    screeningData.statusDate = {
+      ...interviewData.statusDate,
+      "AI Screening": newDate,
+      "Human Interview": newDate,
     };
-    // Remove origin from interviewData
-    if (interviewData.origin) {
-      delete interviewData.origin;
-    }
+    screeningData.stateClass = "state-accepted";
+    screeningData.aiSettingResult = "Passed";
 
-    let interviewInstance = await db
-      .collection("interviews")
-      .findOne({ id: interviewData.id, email: interviewData.email });
+    interviewTransaction = {
+      _id: new ObjectId(),
+      interviewUID: interviewData._id.toString(),
+      fromStage: "Pending AI Interview",
+      toStage: "For Human Interview",
+      action: "Endorsed",
+      updatedBy: {
+        name: "Jia",
+        image: null,
+        email: null,
+      },
+      createdAt: Date.now(),
+    };
 
-    if (interviewInstance) {
-      return NextResponse.json({
-        error: "Job Application Failed.",
-        message: "You have a pending application for this role.",
-      });
-    }
+    screeningData.applicationMetadata = {
+      updatedAt: Date.now(),
+      updatedBy: {
+        name: "Jia",
+        image: null,
+        email: null,
+      },
+      action: "Endorsed",
+    };
+  } else {
+    // Other results - For Review
+    screeningData.currentStep = "AI Screening";
+    screeningData.status = "For AI Screening Review";
+    screeningData.statusDate = {
+      ...interviewData.statusDate,
+      "AI Screening": newDate,
+    };
+    screeningData.stateClass = result.result === "No Fit" || result.result === "Bad Fit" 
+      ? "state-rejected" 
+      : "state-pending";
+    screeningData.aiSettingResult = result.result === "No Fit" || result.result === "Bad Fit"
+      ? "Failed"
+      : "For Review";
 
-    await db.collection("interviews").insertOne(interviewData);
+    interviewTransaction = {
+      _id: new ObjectId(),
+      interviewUID: interviewData._id.toString(),
+      fromStage: "Pending AI Interview",
+      action: "For Review",
+      updatedBy: {
+        name: "Jia",
+        image: null,
+        email: null,
+      },
+      createdAt: Date.now(),
+    };
 
-    const existingAffiliation = await db.collection("affiliations").findOne({
-      "applicantInfo.email": interviewData.email,
-      orgID: interviewData.orgID,
-    });
+    screeningData.applicationMetadata = {
+      updatedAt: Date.now(),
+      updatedBy: {
+        name: "Jia",
+        image: null,
+        email: null,
+      },
+      action: "For Review",
+    };
+  }
 
-    if (!existingAffiliation) {
-      await db.collection("affiliations").insertOne({
-        type: "applicant",
-        applicantInfo: {
-          name: interviewData.name,
-          email: interviewData.email,
-          image: interviewData.image,
-        },
-        createdAt: new Date(),
-        orgID: interviewData.orgID,
-      });
-    }
-
-    await sendEmail({
-      recipient: interviewData.email,
-      html: `
-      <div>
-        <p>Dear ${interviewData.name},</p>
-        <p>Your job application has been successfully submitted for the role of ${interviewData.jobTitle}.</p>
-        <p>You can access your interview here: <a href="https://www.hellojia.ai/interview/${interviewData.interviewID}">Interview Link</a></p>
-      </div>
-    `,
-    });
-
-    if (status === "For Interview" && origin === "direct-interview") {
-      const interviewDetails = await db.collection("interviews").findOne({ id: interviewData.id, email: interviewData.email });
-      if (interviewDetails) {
-        await db.collection("interview-history").insertOne({
-          interviewUID: interviewDetails._id.toString(),
-          toStage: "Pending AI Interview",
-          action: "Direct Link Promotion",
-          createdAt: Date.now(),
-        });
-
-        // Update career lastActivityAt to current date
-        await db.collection("careers").updateOne(
-          { id: interviewDetails.id },
-          { $set: { lastActivityAt: new Date() } }
-        );
+  // Check AI screening setting from career if it exists
+  if (interviewData.AIscreeningSetting) {
+    if (interviewData.AIscreeningSetting === "Only Strong Fit") {
+      if (result.result === "Strong Fit") {
+        screeningData.currentStep = "Human Interview";
+        screeningData.status = "For Human Interview";
+        screeningData.stateClass = "state-accepted";
+        screeningData.aiSettingResult = "Passed";
+        
+        // Update transaction for promotion
+        interviewTransaction.toStage = "For Human Interview";
+        interviewTransaction.action = "Endorsed";
+      } else {
+        screeningData.status = "For AI Screening Review";
+        screeningData.stateClass = "state-rejected";
+        screeningData.aiSettingResult = "Failed";
+        
+        // Update transaction for rejection
+        interviewTransaction.action = "Failed Screening";
+        delete interviewTransaction.toStage;
+      }
+    } else if (interviewData.AIscreeningSetting === "Good Fit and above") {
+      if (result.result === "Good Fit" || result.result === "Strong Fit") {
+        screeningData.currentStep = "Human Interview";
+        screeningData.status = "For Human Interview";
+        screeningData.stateClass = "state-accepted";
+        screeningData.aiSettingResult = "Passed";
+        
+        // Update transaction for promotion
+        interviewTransaction.toStage = "For Human Interview";
+        interviewTransaction.action = "Endorsed";
+      } else {
+        screeningData.status = "For AI Screening Review";
+        screeningData.stateClass = "state-rejected";
+        screeningData.aiSettingResult = "Failed";
+        
+        // Update transaction for rejection
+        interviewTransaction.action = "Failed Screening";
+        delete interviewTransaction.toStage;
       }
     }
-
-    return NextResponse.json({
-      message: "Interview added successfully",
-      interviewData,
-    });
-  } catch (error) {
-    console.error("Error adding career:", error);
-    return NextResponse.json(
-      { error: "Failed to add career" },
-      { status: 500 }
-    );
   }
+
+  // Update interview document
+  await db
+    .collection("interviews")
+    .updateOne({ interviewID: interviewID }, { $set: screeningData });
+
+  // Save transaction history
+  if (interviewTransaction) {
+    await db.collection("interview-history").insertOne(interviewTransaction);
+  }
+
+  // Update career lastActivityAt
+  await db
+    .collection("careers")
+    .updateOne(
+      { id: interviewData.id },
+      { $set: { lastActivityAt: new Date() } }
+    );
+
+  return NextResponse.json({
+    ...screeningData,
+    aiStatus: result.result,
+  });
 }
