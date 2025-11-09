@@ -1,3 +1,4 @@
+// get careers
 import { NextResponse } from "next/server";
 import connectMongoDB from "../../../lib/mongoDB/mongoDB";
 

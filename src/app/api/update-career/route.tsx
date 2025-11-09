@@ -5,38 +5,68 @@ import { ObjectId } from "mongodb";
 export async function POST(request: Request) {
   try {
     let requestData = await request.json();
-    const { _id } = requestData;
-
-    // Validate required fields
-    if (!_id) {
-      return NextResponse.json(
-        { error: "Job Object ID is required" },
-        { status: 400 }
-      );
-    }
+    const { _id, ...careerData } = requestData;
 
     const { db } = await connectMongoDB();
 
-    let dataUpdates = { ...requestData };
+    // Check if this is an update or create operation
+    if (_id) {
+      // UPDATE existing career
+      console.log("Updating existing career with _id:", _id);
+      
+      const result = await db
+        .collection("careers")
+        .updateOne(
+          { _id: new ObjectId(_id) }, 
+          { 
+            $set: {
+              ...careerData,
+              updatedAt: new Date().toISOString()
+            }
+          }
+        );
 
-    delete dataUpdates._id;
+      if (result.matchedCount === 0) {
+        return NextResponse.json(
+          { error: "Career not found" },
+          { status: 404 }
+        );
+      }
 
-    const career = {
-      ...dataUpdates,
-    };
+      return NextResponse.json({
+        message: "Career updated successfully",
+        career: { 
+          _id, 
+          ...careerData 
+        },
+      });
+    } else {
+      // CREATE new career
+      console.log("Creating new career");
+      
+      const newCareer = {
+        ...careerData,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lastActivityAt: new Date().toISOString(),
+      };
 
-    await db
-      .collection("careers")
-      .updateOne({ _id: new ObjectId(_id) }, { $set: career });
+      const result = await db
+        .collection("careers")
+        .insertOne(newCareer);
 
-    return NextResponse.json({
-      message: "Career updated successfully",
-      career,
-    });
+      return NextResponse.json({
+        message: "Career created successfully",
+        career: { 
+          _id: result.insertedId.toString(),
+          ...newCareer 
+        },
+      });
+    }
   } catch (error) {
-    console.error("Error adding career:", error);
+    console.error("Error managing career:", error);
     return NextResponse.json(
-      { error: "Failed to add career" },
+      { error: "Failed to manage career", details: error.message },
       { status: 500 }
     );
   }
