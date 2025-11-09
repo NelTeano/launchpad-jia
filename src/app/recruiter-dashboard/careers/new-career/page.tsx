@@ -28,7 +28,6 @@ export default function NewCareerPage() {
       const storedOrgList = localStorage.getItem('orgList');
       if (storedOrgList) {
         const orgList = JSON.parse(storedOrgList);
-        // Get the first organization's _id
         return orgList.length > 0 ? orgList[0]._id : "";
       }
     }
@@ -37,6 +36,9 @@ export default function NewCareerPage() {
 
   const [currentStep, setCurrentStep] = useState("Career Details and Team Access");
   const [isSaving, setIsSaving] = useState(false);
+
+  // Validation errors state
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
 
   // Career Details State
   const [jobTitle, setJobTitle] = useState("");
@@ -67,15 +69,13 @@ export default function NewCareerPage() {
     { id: 5, category: "Others", questionCountToAsk: null, questions: [] },
   ]);
 
-  // Store the career ID after creation (you should get this from your creation endpoint)
+  // Store the career ID after creation
   const [careerId, setCareerId] = useState<string | null>(null);
 
   // Validate localStorage data on mount
   useEffect(() => {
     if (!user.email || !orgID) {
       console.warn("Missing user or organization data from localStorage");
-      // Optionally redirect to login or show error
-      // window.location.href = "/login";
     }
   }, [user, orgID]);
 
@@ -84,38 +84,66 @@ export default function NewCareerPage() {
 
   function processState(index: number, isAdvance = false) {
     const currentStepIndex = steps.indexOf(currentStep);
+    
+    // If this is the current step
     if (currentStepIndex === index) {
-      if (index === stepStatus.length - 1) return stepStatus[0];
-      return isAdvance ? stepStatus[2] : stepStatus[1];
-    }
-    if (currentStepIndex > index) return stepStatus[0];
-    return stepStatus[1];
-  }
-
-  const isFormValid = () => {
-    if (currentStep === "Career Details and Team Access") {
-      return jobTitle.trim().length > 0 && 
-             description.trim().length > 0 && 
-             workSetup.trim().length > 0 &&
-             city.trim().length > 0;
-    }
-    if (currentStep === "AI-Interview Setup") {
-      return questions.some(q => q.questions.length > 0);
-    }
-    return true;
-  };
-
-  const handleSaveAndContinue = () => {
-    if (!isFormValid()) {
-      alert("Please fill in all required fields");
-      return;
+      return isAdvance ? stepStatus[2] : stepStatus[0]; // "In Progress" for advance view, "Completed" for main
     }
     
-    const currentStepIndex = steps.indexOf(currentStep);
-    if (currentStepIndex < steps.length - 1) {
-      setCurrentStep(steps[currentStepIndex + 1]);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    // If we've passed this step
+    if (currentStepIndex > index) {
+      return stepStatus[0]; // "Completed"
     }
+    
+    // If we haven't reached this step yet
+    return stepStatus[1]; // "Pending"
+  }
+
+  const validateCurrentStep = () => {
+    const errors: {[key: string]: string} = {};
+
+    if (currentStep === "Career Details and Team Access") {
+      if (!jobTitle.trim()) {
+        errors.jobTitle = "Job title is required";
+      }
+      if (!description.trim()) {
+        errors.description = "Job description is required";
+      }
+      if (!workSetup.trim()) {
+        errors.workSetup = "Work arrangement is required";
+      }
+      if (!city.trim()) {
+        errors.city = "City is required";
+      }
+      if (!salaryNegotiable) {
+        if (!minimumSalary || Number(minimumSalary) <= 0) {
+          errors.minimumSalary = "Minimum salary is required";
+        }
+        if (!maximumSalary || Number(maximumSalary) <= 0) {
+          errors.maximumSalary = "Maximum salary is required";
+        }
+        if (minimumSalary && maximumSalary && Number(minimumSalary) > Number(maximumSalary)) {
+          errors.minimumSalary = "Minimum salary cannot be greater than maximum";
+          errors.maximumSalary = "Maximum salary cannot be less than minimum";
+        }
+      }
+    }
+
+    if (currentStep === "CV Review and Pre-Screening") {
+      if (preScreeningQuestions.length === 0) {
+        errors.preScreeningQuestions = "At least one pre-screening question is required";
+      }
+    }
+
+    if (currentStep === "AI-Interview Setup") {
+      const totalQuestions = questions.reduce((acc, q) => acc + q.questions.length, 0);
+      if (totalQuestions === 0) {
+        errors.interviewQuestions = "At least one interview question is required";
+      }
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const generateUniqueId = () => {
@@ -145,7 +173,7 @@ export default function NewCareerPage() {
       if (q.type === "Dropdown" || q.type === "Multiple Choice") {
         baseQuestion.answers = q.options ? q.options.map((opt: string, optIndex: number) => ({
           id: String(optIndex + 1),
-          value: opt, // No HTML encoding needed
+          value: opt,
           type: q.type
         })) : [];
       }
@@ -175,11 +203,11 @@ export default function NewCareerPage() {
       minimumSalary: minimumSalary ? Number(minimumSalary) : 0,
       maximumSalary: maximumSalary ? Number(maximumSalary) : 0,
       screeningSetting,
-      AIscreeningSetting: interviewScreeningSetting, // Keep this name to match your existing data
+      AIscreeningSetting: interviewScreeningSetting,
       secretPrompt: secretPrompt || "",
       preScreeningQuestions: transformedPreScreeningQuestions,
       requireVideo,
-      status: status === "active" ? "active" : "inactive", // Use "active" for published, "inactive" for unpublished
+      status: status === "active" ? "active" : "inactive",
       lastEditedBy: userInfoSlice,
       createdBy: userInfoSlice,
       orgID,
@@ -191,11 +219,10 @@ export default function NewCareerPage() {
       lastActivityAt: now,
     };
 
-    // Only include _id if we're updating (careerId exists)
+    // Only include _id if we're updating
     if (careerId) {
       careerData._id = careerId;
     } else {
-      // For new careers, generate a UUID for the 'id' field and include createdAt
       careerData.id = generateUniqueId();
       careerData.createdAt = now;
     }
@@ -203,18 +230,37 @@ export default function NewCareerPage() {
     return careerData;
   };
 
-  const handleSaveAsUnpublished = async () => {
-    if (Number(minimumSalary) && Number(maximumSalary) && Number(minimumSalary) > Number(maximumSalary)) {
-      alert("Minimum salary cannot be greater than maximum salary");
-      return;
+  const saveCareerData = async (status: string, showSuccessMessage = true) => {
+    // Validate all steps before saving
+    const currentStepBackup = currentStep;
+    let allValid = true;
+
+    // Validate each step
+    for (const step of steps) {
+      setCurrentStep(step);
+      if (!validateCurrentStep()) {
+        allValid = false;
+        if (step === currentStepBackup) {
+          // Stay on current step if it has errors
+          break;
+        } else {
+          // Move to first step with errors
+          alert(`Please complete all required fields in "${step}" before saving.`);
+          return false;
+        }
+      }
+    }
+
+    // Restore current step
+    setCurrentStep(currentStepBackup);
+
+    if (!allValid) {
+      return false;
     }
 
     setIsSaving(true);
     try {
-      const careerData = prepareCareerData("inactive");
-      
-      console.log("Saving as unpublished (status: inactive):", careerId ? "UPDATE" : "CREATE");
-      console.log("Data:", JSON.stringify(careerData, null, 2));
+      const careerData = prepareCareerData(status);
       
       const response = await fetch("/api/update-career", {
         method: "POST",
@@ -230,21 +276,49 @@ export default function NewCareerPage() {
       }
 
       const result = await response.json();
-      console.log("Career saved successfully:", result);
       
       // Store the career ID for future updates
       if (result.career && result.career._id) {
         setCareerId(result.career._id);
       }
+
       
-      alert(careerId ? "Career updated as unpublished!" : "Career saved as unpublished (Draft)!\n\nYou can continue editing or publish it later from the careers page.");
-      
+      return true;
     } catch (error: any) {
       console.error("Error saving career:", error);
       alert(`Failed to save career: ${error.message}`);
+      return false;
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSaveAndContinue = () => {
+    // Clear previous validation errors
+    setValidationErrors({});
+    
+    // Validate current step
+    if (!validateCurrentStep()) {
+      // Scroll to first error
+      setTimeout(() => {
+        const firstError = document.querySelector('[data-error="true"]');
+        if (firstError) {
+          firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      return;
+    }
+    
+    // Move to next step without saving
+    const currentStepIndex = steps.indexOf(currentStep);
+    if (currentStepIndex < steps.length - 1) {
+      setCurrentStep(steps[currentStepIndex + 1]);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleSaveAsUnpublished = async () => {
+    await saveCareerData("inactive", true);
   };
 
   const handlePublish = async () => {
@@ -253,57 +327,16 @@ export default function NewCareerPage() {
       return;
     }
 
-    if (!isFormValid()) {
-      alert("Please fill in all required fields");
-      return;
-    }
-
-    if (Number(minimumSalary) && Number(maximumSalary) && Number(minimumSalary) > Number(maximumSalary)) {
-      alert("Minimum salary cannot be greater than maximum salary");
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const careerData = prepareCareerData("active");
-      
-      console.log("Publishing (status: active):", careerId ? "UPDATE" : "CREATE");
-      console.log("Data:", JSON.stringify(careerData, null, 2));
-      
-      const response = await fetch("/api/update-career", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(careerData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to publish career");
-      }
-
-      const result = await response.json();
-      console.log("Career published successfully:", result);
-      
-      // Store the career ID
-      if (result.career && result.career._id) {
-        setCareerId(result.career._id);
-      }
-            
+    const saved = await saveCareerData("active", true);
+    if (saved) {
       // Redirect to careers page after successful publish
       window.location.href = "/recruiter-dashboard/careers";
-      
-    } catch (error: any) {
-      console.error("Error publishing career:", error);
-      alert(`Failed to publish career: ${error.message}`);
-    } finally {
-      setIsSaving(false);
     }
   };
 
   // Create career object to pass to child components
   const careerData = {
+    _id: careerId,
     jobTitle,
     description,
     employmentType,
@@ -318,9 +351,9 @@ export default function NewCareerPage() {
     screeningSetting,
     secretPrompt,
     preScreeningQuestions,
-    interviewScreeningSetting,
+    AIscreeningSetting: interviewScreeningSetting,
     requireVideo,
-    interviewQuestions: questions,
+    questions,
   };
 
   return (
@@ -349,20 +382,20 @@ export default function NewCareerPage() {
             </button>
             <button
               onClick={currentStep === "Review Career" ? handlePublish : handleSaveAndContinue}
-              disabled={!isFormValid() || isSaving}
+              disabled={isSaving}
               style={{ 
                 width: "fit-content", 
-                background: (isFormValid() && !isSaving) ? "#5E72E4" : "#D5D7DA", 
+                background: isSaving ? "#D5D7DA" : "#000000ff", 
                 color: "#fff", 
                 border: "1px solid #E9EAEB", 
                 padding: "8px 16px", 
                 borderRadius: "60px", 
                 whiteSpace: "nowrap",
-                cursor: (isFormValid() && !isSaving) ? "pointer" : "not-allowed"
+                cursor: isSaving ? "not-allowed" : "pointer"
               }}
             >
               <i className="la la-check-circle" style={{ color: "#fff", fontSize: 20, marginRight: 8 }}></i>
-              {isSaving ? "Publishing..." : currentStep === "Review Career" ? "Publish Career" : "Save and continue"}
+              {isSaving ? "Saving..." : currentStep === "Review Career" ? "Publish Career" : "Save and continue"}
             </button>
           </div>
         </div> 
@@ -436,6 +469,7 @@ export default function NewCareerPage() {
               setMinimumSalary={setMinimumSalary}
               maximumSalary={maximumSalary}
               setMaximumSalary={setMaximumSalary}
+              validationErrors={validationErrors}
             />
           )}
           {currentStep === "CV Review and Pre-Screening" && (
@@ -447,6 +481,7 @@ export default function NewCareerPage() {
               setSecretPrompt={setSecretPrompt}
               preScreeningQuestions={preScreeningQuestions}
               setPreScreeningQuestions={setPreScreeningQuestions}
+              validationErrors={validationErrors}
             />
           )}
           {currentStep === "AI-Interview Setup" && (
@@ -460,27 +495,45 @@ export default function NewCareerPage() {
               setRequireVideo={setRequireVideo}
               questions={questions}
               setQuestions={setQuestions}
+              validationErrors={validationErrors}
             />
           )}
           {currentStep === "Review Career" && (
             <ReviewCareerForm 
               career={careerData}
               jobTitle={jobTitle}
+              setJobTitle={setJobTitle}
               description={description}
+              setDescription={setDescription}
               employmentType={employmentType}
+              setEmploymentType={setEmploymentType}
               workSetup={workSetup}
+              setWorkSetup={setWorkSetup}
               country={country}
+              setCountry={setCountry}
               province={province}
+              setProvince={setProvince}
               city={city}
+              setCity={setCity}
               salaryNegotiable={salaryNegotiable}
+              setSalaryNegotiable={setSalaryNegotiable}
               minimumSalary={minimumSalary}
+              setMinimumSalary={setMinimumSalary}
               maximumSalary={maximumSalary}
+              setMaximumSalary={setMaximumSalary}
               screeningSetting={screeningSetting}
+              setScreeningSetting={setScreeningSetting}
               secretPrompt={secretPrompt}
+              setSecretPrompt={setSecretPrompt}
               preScreeningQuestions={preScreeningQuestions}
+              setPreScreeningQuestions={setPreScreeningQuestions}
               interviewScreeningSetting={interviewScreeningSetting}
+              setInterviewScreeningSetting={setInterviewScreeningSetting}
               requireVideo={requireVideo}
+              setRequireVideo={setRequireVideo}
               interviewQuestions={questions}
+              setInterviewQuestions={setQuestions}
+              validationErrors={validationErrors}
             />
           )}
         </div>

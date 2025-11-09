@@ -10,6 +10,7 @@ export default function PreScreeningForm({
     setSecretPrompt,
     preScreeningQuestions,
     setPreScreeningQuestions,
+    validationErrors = {}
 }: {
     career?: any;
     screeningSetting: string;
@@ -18,6 +19,7 @@ export default function PreScreeningForm({
     setSecretPrompt: (val: string) => void;
     preScreeningQuestions: any[];
     setPreScreeningQuestions: (val: any[]) => void;
+    validationErrors?: {[key: string]: string};
 }) {
     // Remove duplicate state declarations - only keep modal states
     const [showAddCustomModal, setShowAddCustomModal] = useState(false);
@@ -349,7 +351,6 @@ export default function PreScreeningForm({
             <CustomQuestionModal />
             
             <div style={{ width: "60%", display: "flex", flexDirection: "column", gap: 8 }}>
-                <div className="layered-card-outer">
                     <div className="layered-card-middle">
                         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
                             <div style={{ width: 32, height: 32, backgroundColor: "#181D27", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -378,7 +379,7 @@ export default function PreScreeningForm({
                                 <span style={{ fontSize: 14, color: "#6c757d", marginLeft: 4 }}>(optional)</span>
                             </div>
                             <div style={{marginBottom: 10, marginTop: 4}}>
-                                <span style={{ fontSize: 14 }}>Secret Prompts give you extra control over Jia’s evaluation style, complementing her accurate assessment of requirements from the job description.</span>
+                                <span style={{ fontSize: 14 }}>Secret Prompts give you extra control over Jia's evaluation style, complementing her accurate assessment of requirements from the job description.</span>
                             </div>
                             <textarea
                                 className="form-control"
@@ -390,17 +391,14 @@ export default function PreScreeningForm({
                             />
                         </div>
                     </div>
-                </div>
 
-                <div className="layered-card-outer">
-                    <div className="layered-card-middle">
+                    <div className="layered-card-middle" data-error={!!validationErrors.preScreeningQuestions}>
                         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                 <div style={{ width: 32, height: 32, backgroundColor: "#181D27", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                     <i className="la la-question-circle" style={{ color: "#FFFFFF", fontSize: 20 }}></i>
                                 </div>
                                 <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>2. Pre-Screening Questions</span>
-                                <span style={{ fontSize: 14, color: "#6c757d" }}>(optional)</span>
                                 <div style={{
                                     backgroundColor: "#E9EAEB",
                                     borderRadius: "50%",
@@ -437,8 +435,19 @@ export default function PreScreeningForm({
                         <div className="layered-card-content">
                             {preScreeningQuestions.length === 0 ? (
                                 <>
-                                    <div style={{ padding: "20px 0", color: "#6c757d", textAlign: "center" }}>
-                                        No pre-screening questions added yet.
+                                    <div style={{ 
+                                        padding: "20px 0", 
+                                        color: validationErrors.preScreeningQuestions ? "#dc3545" : "#6c757d", 
+                                        textAlign: "center",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        gap: 8
+                                    }}>
+                                        {validationErrors.preScreeningQuestions && (
+                                            <i className="la la-exclamation-circle" style={{ fontSize: 32, color: "#dc3545" }}></i>
+                                        )}
+                                        <span>{validationErrors.preScreeningQuestions || "No pre-screening questions added yet."}</span>
                                     </div>
                                     
                                     <div style={{ marginTop: 20, borderTop: "1px solid #E9EAEB", paddingTop: 20 }}>
@@ -594,11 +603,39 @@ export default function PreScreeningForm({
                             )}
                         </div>
                     </div>
-                </div>
+                    
+                    {validationErrors.preScreeningQuestions && (
+                        <div style={{
+                            padding: "8px 0",
+                            marginTop: 8,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8
+                        }}>
+                            <i className="la la-exclamation-circle" style={{ color: "#dc3545", fontSize: 18 }}></i>
+                            <span style={{ color: "#dc3545", fontSize: 14 }}>
+                                {validationErrors.preScreeningQuestions}
+                            </span>
+                        </div>
+                    )}
+
+                    {preScreeningQuestions.length > 0 && !validationErrors.preScreeningQuestions && (
+                        <div style={{
+                            padding: "8px 0",
+                            marginTop: 8,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8
+                        }}>
+                            <i className="la la-check-circle" style={{ color: "#28a745", fontSize: 18 }}></i>
+                            <span style={{ color: "#181D27", fontSize: 14 }}>
+                                Total questions added: <strong>{preScreeningQuestions.length}</strong>
+                            </span>
+                        </div>
+                    )}
             </div>
 
             <div style={{ width: "40%", display: "flex", flexDirection: "column", gap: 8 }}>
-                <div className="layered-card-outer">
                     <div className="layered-card-middle">
                         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
                             <div style={{ width: 32, height: 32, backgroundColor: "#181D27", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -627,7 +664,6 @@ export default function PreScreeningForm({
                             </div>
                         </div>
                     </div>
-                </div>
             </div>
         </div>
     );

@@ -13,6 +13,7 @@ export default function AIInterviewSetupForm({
     setRequireVideo,
     questions,
     setQuestions,
+    validationErrors = {}
 }: {
     career?: any;
     jobTitle?: string;
@@ -23,6 +24,7 @@ export default function AIInterviewSetupForm({
     setRequireVideo: (val: boolean) => void;
     questions: any[];
     setQuestions: (val: any[]) => void;
+    validationErrors?: {[key: string]: string};
 }) {
     
     const screeningSettingList = [
@@ -40,10 +42,11 @@ export default function AIInterviewSetupForm({
         },
     ];
 
+    const totalQuestions = questions?.reduce((acc, q) => acc + q.questions.length, 0) || 0;
+
     return (
         <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", width: "100%", gap: 16, alignItems: "flex-start", marginTop: 16 }}>
             <div style={{ width: "60%", display: "flex", flexDirection: "column", gap: 8 }}>
-                <div className="layered-card-outer">
                     <div className="layered-card-middle">
                         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
                             <div style={{ width: 32, height: 32, backgroundColor: "#181D27", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -90,18 +93,48 @@ export default function AIInterviewSetupForm({
                             </div>
                         </div>
                     </div>
+                
+                <div data-error={!!validationErrors.interviewQuestions}>
+                  <InterviewQuestionGeneratorV2 
+                      questions={questions} 
+                      setQuestions={(questions) => setQuestions(questions)} 
+                      jobTitle={jobTitle} 
+                      description={description} 
+                  />
                 </div>
                 
-                <InterviewQuestionGeneratorV2 
-                    questions={questions} 
-                    setQuestions={(questions) => setQuestions(questions)} 
-                    jobTitle={jobTitle} 
-                    description={description} 
-                />
+                {validationErrors.interviewQuestions && (
+                  <div style={{
+                    padding: "8px 0",
+                    marginTop: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8
+                  }}>
+                    <i className="la la-exclamation-circle" style={{ color: "#dc3545", fontSize: 18 }}></i>
+                    <span style={{ color: "#dc3545", fontSize: 14 }}>
+                      {validationErrors.interviewQuestions}
+                    </span>
+                  </div>
+                )}
+
+                {totalQuestions > 0 && !validationErrors.interviewQuestions && (
+                  <div style={{
+                    padding: "8px 0",
+                    marginTop: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8
+                  }}>
+                    <i className="la la-check-circle" style={{ color: "#28a745", fontSize: 18 }}></i>
+                    <span style={{ color: "#181D27", fontSize: 14 }}>
+                      Total questions added: <strong>{totalQuestions}</strong>
+                    </span>
+                  </div>
+                )}
             </div>
 
             <div style={{ width: "40%", display: "flex", flexDirection: "column", gap: 8 }}>
-                <div className="layered-card-outer">
                     <div className="layered-card-middle">
                         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
                             <div style={{ width: 32, height: 32, backgroundColor: "#181D27", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -136,7 +169,6 @@ export default function AIInterviewSetupForm({
                             </div>
                         </div>
                     </div>
-                </div>
             </div>
         </div>
     );

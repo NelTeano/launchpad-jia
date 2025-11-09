@@ -29,6 +29,7 @@ export default function CareerDetailsForm({
     setMinimumSalary,
     maximumSalary,
     setMaximumSalary,
+    validationErrors = {}
 }: {
     career?: any;
     jobTitle: string;
@@ -53,12 +54,11 @@ export default function CareerDetailsForm({
     setMinimumSalary: (val: string) => void;
     maximumSalary: string;
     setMaximumSalary: (val: string) => void;
+    validationErrors?: {[key: string]: string};
 }) {
-    // Only keep local state for province and city lists
     const [provinceList, setProvinceList] = useState([]);
     const [cityList, setCityList] = useState([]);
 
-    // Add this useEffect to initialize the lists
     useEffect(() => {
         const parseProvinces = () => {
           setProvinceList(philippineCitiesAndProvinces.provinces);
@@ -76,30 +76,19 @@ export default function CareerDetailsForm({
     }, [])
 
     const employmentTypeOptions = [
-        {
-            name: "Full-Time",
-        },
-        {
-            name: "Part-Time",
-        },
+        { name: "Full-Time" },
+        { name: "Part-Time" },
     ];
 
     const workSetupOptions = [
-        {
-            name: "Fully Remote",
-        },
-        {
-            name: "Onsite",
-        },
-        {
-            name: "Hybrid",
-        },
+        { name: "Fully Remote" },
+        { name: "Onsite" },
+        { name: "Hybrid" },
     ];
 
     return (
         <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", width: "100%", gap: 16, alignItems: "flex-start", marginTop: 16 }}>
             <div style={{ width: "60%", display: "flex", flexDirection: "column", gap: 8 }}>
-                <div className="layered-card-outer">
                     <div className="layered-card-middle">
                         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
                             <div style={{ width: 32, height: 32, backgroundColor: "#181D27", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -109,51 +98,62 @@ export default function CareerDetailsForm({
                         </div>
                         <div className="layered-card-content">
                             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                    <span>Job Title</span>
+                                    <span>Job Title <span style={{color: "#dc3545"}}>*</span></span>
                                     <input
                                       value={jobTitle}
                                       className="form-control"
                                       placeholder="Enter job title"
-                                      onChange={(e) => {
-                                          setJobTitle(e.target.value || "");
+                                      onChange={(e) => setJobTitle(e.target.value || "")}
+                                      data-error={!!validationErrors.jobTitle}
+                                      style={{
+                                        borderColor: validationErrors.jobTitle ? "#dc3545" : undefined,
+                                        borderWidth: validationErrors.jobTitle ? "2px" : undefined
                                       }}
                                     />
+                                    {validationErrors.jobTitle && (
+                                      <span style={{ color: "#dc3545", fontSize: 14, marginTop: -4 }}>
+                                        <i className="la la-exclamation-circle"></i> {validationErrors.jobTitle}
+                                      </span>
+                                    )}
+                                    
                                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                         <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>Work Setting</span>
                                         <div style={{ display: "flex", flexDirection: "row", gap: 8 }}>
                                             <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
                                                 <span>Employment Type</span>
                                                 <CustomDropdown
-                                                    onSelectSetting={(type) => {
-                                                        setEmploymentType(type);
-                                                    }}
+                                                    onSelectSetting={(type) => setEmploymentType(type)}
                                                     screeningSetting={employmentType}
                                                     settingList={employmentTypeOptions}
                                                     placeholder="Select Employment Type"
                                                 />
                                             </div>
                                             <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
-                                                <span>Arrangement</span>
-                                                <CustomDropdown
-                                                    onSelectSetting={(setting) => {
-                                                        setWorkSetup(setting);
-                                                    }}
-                                                    screeningSetting={workSetup}
-                                                    settingList={workSetupOptions}
-                                                    placeholder="Select Work Setup"
-                                                />
+                                                <span>Arrangement <span style={{color: "#dc3545"}}>*</span></span>
+                                                <div data-error={!!validationErrors.workSetup}>
+                                                  <CustomDropdown
+                                                      onSelectSetting={(setting) => setWorkSetup(setting)}
+                                                      screeningSetting={workSetup}
+                                                      settingList={workSetupOptions}
+                                                      placeholder="Select Work Setup"
+                                                  />
+                                                </div>
+                                                {validationErrors.workSetup && (
+                                                  <span style={{ color: "#dc3545", fontSize: 14, marginTop: -4 }}>
+                                                    <i className="la la-exclamation-circle"></i> {validationErrors.workSetup}
+                                                  </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
+                                    
                                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                         <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>Location</span>
                                         <div style={{ display: "flex", flexDirection: "row", gap: 8 }}>
                                             <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
                                                 <span>Country</span>
                                                 <CustomDropdown
-                                                    onSelectSetting={(setting) => {
-                                                        setCountry(setting);
-                                                    }}
+                                                    onSelectSetting={(setting) => setCountry(setting)}
                                                     screeningSetting={country}
                                                     settingList={[]}
                                                     placeholder="Select Country"
@@ -175,22 +175,27 @@ export default function CareerDetailsForm({
                                                 />
                                             </div>
                                             <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
-                                                <span>City</span>
-                                                <CustomDropdown
-                                                    onSelectSetting={(selectedCity) => {
-                                                        setCity(selectedCity);
-                                                    }}
-                                                    screeningSetting={city}
-                                                    settingList={cityList}
-                                                    placeholder="Select City"
-                                                />
+                                                <span>City <span style={{color: "#dc3545"}}>*</span></span>
+                                                <div data-error={!!validationErrors.city}>
+                                                  <CustomDropdown
+                                                      onSelectSetting={(selectedCity) => setCity(selectedCity)}
+                                                      screeningSetting={city}
+                                                      settingList={cityList}
+                                                      placeholder="Select City"
+                                                  />
+                                                </div>
+                                                {validationErrors.city && (
+                                                  <span style={{ color: "#dc3545", fontSize: 14, marginTop: -4 }}>
+                                                    <i className="la la-exclamation-circle"></i> {validationErrors.city}
+                                                  </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
 
                                     <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
                                         <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
-                                            <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>Salary</span>
+                                            <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>Salary {!salaryNegotiable && <span style={{color: "#dc3545"}}>*</span>}</span>
                                             <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-start", gap: 8, minWidth: "130px" }}>
                                                 <label className="switch">
                                                     <input type="checkbox" checked={salaryNegotiable} onChange={() => setSalaryNegotiable(!salaryNegotiable)} />
@@ -204,29 +209,29 @@ export default function CareerDetailsForm({
                                             <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>    
                                                 <span>Minimum Salary</span>
                                                 <div style={{ position: "relative" }}>
-                                                    <span
-                                                        style={{
-                                                            position: "absolute",
-                                                            left: "12px",
-                                                            top: "50%",
-                                                            transform: "translateY(-50%)",
-                                                            color: "#6c757d",
-                                                            fontSize: "16px",
-                                                            pointerEvents: "none",
-                                                        }}
-                                                    >
-                                                        P
-                                                    </span>
+                                                    <span style={{
+                                                        position: "absolute",
+                                                        left: "12px",
+                                                        top: "50%",
+                                                        transform: "translateY(-50%)",
+                                                        color: "#6c757d",
+                                                        fontSize: "16px",
+                                                        pointerEvents: "none",
+                                                    }}>P</span>
                                                     <input
                                                         type="number"
                                                         className="form-control"
-                                                        style={{ paddingLeft: "28px" }}
+                                                        style={{ 
+                                                          paddingLeft: "28px",
+                                                          borderColor: validationErrors.minimumSalary ? "#dc3545" : undefined,
+                                                          borderWidth: validationErrors.minimumSalary ? "2px" : undefined
+                                                        }}
                                                         placeholder="0"
                                                         min={0}
                                                         value={minimumSalary}
-                                                        onChange={(e) => {
-                                                            setMinimumSalary(e.target.value || "");
-                                                        }}
+                                                        onChange={(e) => setMinimumSalary(e.target.value || "")}
+                                                        data-error={!!validationErrors.minimumSalary}
+                                                        disabled={salaryNegotiable}
                                                     />
                                                     <span style={{
                                                         position: "absolute",
@@ -236,37 +241,40 @@ export default function CareerDetailsForm({
                                                         color: "#6c757d",
                                                         fontSize: "16px",
                                                         pointerEvents: "none",
-                                                    }}>
-                                                        PHP
-                                                    </span>
+                                                    }}>PHP</span>
                                                 </div>
+                                                {validationErrors.minimumSalary && (
+                                                  <span style={{ color: "#dc3545", fontSize: 14, marginTop: -4 }}>
+                                                    <i className="la la-exclamation-circle"></i> {validationErrors.minimumSalary}
+                                                  </span>
+                                                )}
                                             </div>
                                             <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>    
                                                 <span>Maximum Salary</span>
                                                 <div style={{ position: "relative" }}>
-                                                    <span
-                                                        style={{
-                                                            position: "absolute",
-                                                            left: "12px",
-                                                            top: "50%",
-                                                            transform: "translateY(-50%)",
-                                                            color: "#6c757d",
-                                                            fontSize: "16px",
-                                                            pointerEvents: "none",
-                                                        }}
-                                                    >
-                                                        P
-                                                    </span>
+                                                    <span style={{
+                                                        position: "absolute",
+                                                        left: "12px",
+                                                        top: "50%",
+                                                        transform: "translateY(-50%)",
+                                                        color: "#6c757d",
+                                                        fontSize: "16px",
+                                                        pointerEvents: "none",
+                                                    }}>P</span>
                                                     <input
                                                         type="number"
                                                         className="form-control"
-                                                        style={{ paddingLeft: "28px" }}
+                                                        style={{ 
+                                                          paddingLeft: "28px",
+                                                          borderColor: validationErrors.maximumSalary ? "#dc3545" : undefined,
+                                                          borderWidth: validationErrors.maximumSalary ? "2px" : undefined
+                                                        }}
                                                         placeholder="0"
                                                         min={0}
                                                         value={maximumSalary}
-                                                        onChange={(e) => {
-                                                            setMaximumSalary(e.target.value || "");
-                                                        }}
+                                                        onChange={(e) => setMaximumSalary(e.target.value || "")}
+                                                        data-error={!!validationErrors.maximumSalary}
+                                                        disabled={salaryNegotiable}
                                                     />
                                                     <span style={{
                                                         position: "absolute",
@@ -276,19 +284,20 @@ export default function CareerDetailsForm({
                                                         color: "#6c757d",
                                                         fontSize: "16px",
                                                         pointerEvents: "none",
-                                                    }}>
-                                                        PHP
-                                                    </span>
+                                                    }}>PHP</span>
                                                 </div>
+                                                {validationErrors.maximumSalary && (
+                                                  <span style={{ color: "#dc3545", fontSize: 14, marginTop: -4 }}>
+                                                    <i className="la la-exclamation-circle"></i> {validationErrors.maximumSalary}
+                                                  </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div className="layered-card-outer">
                     <div className="layered-card-middle">
                         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
                             <div style={{ width: 32, height: 32, backgroundColor: "#181D27", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -297,15 +306,20 @@ export default function CareerDetailsForm({
                             <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>Job Description</span>
                         </div>
                         <div className="layered-card-content">
-                            <span>Description</span>
-                            <RichTextEditor setText={setDescription} text={description} />
+                            <span>Description <span style={{color: "#dc3545"}}>*</span></span>
+                            <div data-error={!!validationErrors.description}>
+                              <RichTextEditor setText={setDescription} text={description} />
+                            </div>
+                            {validationErrors.description && (
+                              <span style={{ color: "#dc3545", fontSize: 14, marginTop: 8, display: "block" }}>
+                                <i className="la la-exclamation-circle"></i> {validationErrors.description}
+                              </span>
+                            )}
                         </div>
                     </div>
-                </div>
             </div>
 
             <div style={{ width: "40%", display: "flex", flexDirection: "column", gap: 8 }}>
-                <div className="layered-card-outer">
                     <div className="layered-card-middle">
                         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
                             <div style={{ width: 32, height: 32, backgroundColor: "#181D27", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -334,7 +348,6 @@ export default function CareerDetailsForm({
                         </div>
                         </div>
                     </div>
-                </div>
             </div>
         </div>
     )
