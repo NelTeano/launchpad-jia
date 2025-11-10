@@ -22,19 +22,19 @@ export function middleware(request: NextRequest) {
 
   if (host.startsWith("admin.hirejia.ai") && pathname === "/") {
     const url = request.nextUrl.clone();
-    // Redirect to admin-portal
     url.pathname = `/admin-portal`;
     return NextResponse.rewrite(url);
   }
-   // Redirect to hirejia.ai for recruiter portal
-  if (!host.includes("hirejia") && !host.includes("localhost") && pathname.includes("old-dashboard")) {
+
+  // Redirect to hirejia.ai for recruiter portal
+  if (!host.includes("hirejia") && !host.includes("localhost") && !host.includes("vercel.app") && pathname.includes("old-dashboard")) {
     const newUrl = new URL(request.url);
     newUrl.hostname = `hirejia.ai`;
     return NextResponse.redirect(newUrl);
   }
 
   // Redirect to hellojia.ai for applicant portal
-  if (!host.includes("hellojia") && !host.includes("localhost") && (pathname.includes("applicant") || pathname.includes("job-openings"))) {
+  if (!host.includes("hellojia") && !host.includes("localhost") && !host.includes("vercel.app") && (pathname.includes("applicant") || pathname.includes("job-openings"))) {
     const newUrl = new URL(request.url);
     newUrl.hostname = `hellojia.ai`;
     return NextResponse.redirect(newUrl);
