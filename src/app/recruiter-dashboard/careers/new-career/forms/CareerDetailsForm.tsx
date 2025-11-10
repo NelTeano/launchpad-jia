@@ -91,9 +91,7 @@ export default function CareerDetailsForm({
             <div style={{ width: "60%", display: "flex", flexDirection: "column", gap: 8 }}>
                     <div className="layered-card-middle">
                         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
-                            <div style={{ width: 32, height: 32, backgroundColor: "#181D27", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <i className="la la-suitcase" style={{ color: "#FFFFFF", fontSize: 20 }}></i>
-                            </div>
+                            <span style={{fontSize: 16, color: "#181D27", fontWeight: 700, marginLeft: 8}}>1. </span>
                             <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>Career Information</span>
                         </div>
                         <div className="layered-card-content">
@@ -300,9 +298,7 @@ export default function CareerDetailsForm({
 
                     <div className="layered-card-middle">
                         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
-                            <div style={{ width: 32, height: 32, backgroundColor: "#181D27", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <i className="la la-file-alt" style={{ color: "#FFFFFF", fontSize: 20 }}></i>
-                            </div>
+                            <span style={{fontSize: 16, color: "#181D27", fontWeight: 700, marginLeft: 8}}>2. </span>
                             <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>Job Description</span>
                         </div>
                         <div className="layered-card-content">
@@ -322,8 +318,24 @@ export default function CareerDetailsForm({
             <div style={{ width: "40%", display: "flex", flexDirection: "column", gap: 8 }}>
                     <div className="layered-card-middle">
                         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
-                            <div style={{ width: 32, height: 32, backgroundColor: "#181D27", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <i className="la la-lightbulb" style={{ color: "#FFFFFF", fontSize: 20 }}></i>
+                            <div
+                                style={{
+                                    width: 32,
+                                    height: 32,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                }}
+                                >
+                                <i
+                                    className="la la-lightbulb"
+                                    style={{
+                                    background: "linear-gradient(90deg, #fccec0 0%, #ebacc9 33%, #ceb6da 66%, #9fcaed 100%)",
+                                    WebkitBackgroundClip: "text",
+                                    WebkitTextFillColor: "transparent",
+                                    fontSize: 30,
+                                    }}
+                                ></i>
                             </div>
                             <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>Tips</span>
                         </div>

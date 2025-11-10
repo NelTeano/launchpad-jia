@@ -139,6 +139,19 @@ export default function ReviewCareerForm({
         setShowAddCustomModal(true);
     };
 
+    // Handle reordering questions via drag and drop
+    const handleReorderQuestions = (draggedQuestionId: number, insertIndex: number) => {
+        const updatedQuestions = [...preScreeningQuestions];
+        const draggedIndex = updatedQuestions.findIndex(q => q.id === draggedQuestionId);
+        
+        if (draggedIndex === -1) return;
+        
+        const [draggedQuestion] = updatedQuestions.splice(draggedIndex, 1);
+        updatedQuestions.splice(insertIndex, 0, draggedQuestion);
+        
+        setPreScreeningQuestions(updatedQuestions);
+    };
+
     const toggleSection = (section: string) => {
         setExpandedSections(prev => ({
             ...prev,
@@ -784,7 +797,7 @@ export default function ReviewCareerForm({
                                             </button>
                                         </div>
                                         <div style={{ fontSize: 14, color: "#6c757d", marginBottom: 12 }}>
-                                            Add custom questions to collect key information from candidates
+                                            Add custom questions to collect key information from candidates. Drag questions to reorder them.
                                         </div>
                                         
                                         {preScreeningQuestions.length === 0 ? (
@@ -800,35 +813,78 @@ export default function ReviewCareerForm({
                                         ) : (
                                             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                                                 {preScreeningQuestions.map((q, index) => (
-                                                    <div key={q.id} style={{
-                                                        padding: 12,
-                                                        border: "1px solid #E9EAEB",
-                                                        borderRadius: 8,
-                                                        backgroundColor: "#F8F9FA"
-                                                    }}>
-                                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                                                            <div style={{ flex: 1 }}>
-                                                                <div style={{ fontSize: 14, fontWeight: 600, color: "#181D27", marginBottom: 4 }}>
-                                                                    {q.question}
+                                                    <div 
+                                                        key={q.id} 
+                                                        style={{
+                                                            padding: 16,
+                                                            border: "1px solid #E9EAEB",
+                                                            borderRadius: 8,
+                                                            backgroundColor: "#F8F9FA",
+                                                            cursor: "move"
+                                                        }}
+                                                        draggable={true}
+                                                        onDragStart={(e) => {
+                                                            e.dataTransfer.setData("questionId", q.id.toString());
+                                                        }}
+                                                        onDragOver={(e) => {
+                                                            e.preventDefault();
+                                                            const target = e.currentTarget;
+                                                            const bounding = target.getBoundingClientRect();
+                                                            const offset = bounding.y + bounding.height / 2;
+
+                                                            if (e.clientY - offset > 0) {
+                                                                target.style.borderBottom = "2px solid #5E72E4";
+                                                                target.style.borderTop = "none";
+                                                            } else {
+                                                                target.style.borderTop = "2px solid #5E72E4";
+                                                                target.style.borderBottom = "none";
+                                                            }
+                                                        }}
+                                                        onDragLeave={(e) => {
+                                                            e.currentTarget.style.borderTop = "none";
+                                                            e.currentTarget.style.borderBottom = "none";
+                                                        }}
+                                                        onDrop={(e) => {
+                                                            e.preventDefault();
+                                                            e.currentTarget.style.borderTop = "none";
+                                                            e.currentTarget.style.borderBottom = "none";
+
+                                                            const draggedQuestionId = Number(e.dataTransfer.getData("questionId"));
+                                                            if (!isNaN(draggedQuestionId) && draggedQuestionId !== q.id) {
+                                                                const bounding = e.currentTarget.getBoundingClientRect();
+                                                                const offset = bounding.y + bounding.height / 2;
+                                                                const insertIndex = e.clientY - offset > 0 ? index + 1 : index;
+                                                                
+                                                                handleReorderQuestions(draggedQuestionId, insertIndex);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                                                            <div style={{ flex: 1, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                                                                <i className="la la-grip-vertical" style={{ fontSize: 20, color: "#A4A7AE", marginTop: 2 }}></i>
+                                                                <div style={{ flex: 1 }}>
+                                                                    <div style={{ fontSize: 14, fontWeight: 600, color: "#181D27", marginBottom: 8 }}>
+                                                                        {q.question}
+                                                                    </div>
+                                                                    <span style={{
+                                                                        fontSize: 12,
+                                                                        color: "#6c757d",
+                                                                        padding: "2px 8px",
+                                                                        backgroundColor: "#fff",
+                                                                        borderRadius: 4,
+                                                                        display: "inline-flex",
+                                                                        alignItems: "center",
+                                                                        gap: 4
+                                                                    }}>
+                                                                        <i className={
+                                                                            q.type === "Dropdown" ? "la la-chevron-down" : 
+                                                                            q.type === "Multiple Choice" ? "la la-check-square" : 
+                                                                            q.type === "Range" ? "la la-arrows-alt-h" :
+                                                                            "la la-font"
+                                                                        }></i>
+                                                                        {q.type}
+                                                                    </span>
                                                                 </div>
-                                                                <span style={{
-                                                                    fontSize: 12,
-                                                                    color: "#6c757d",
-                                                                    padding: "2px 8px",
-                                                                    backgroundColor: "#fff",
-                                                                    borderRadius: 4,
-                                                                    display: "inline-flex",
-                                                                    alignItems: "center",
-                                                                    gap: 4
-                                                                }}>
-                                                                    <i className={
-                                                                        q.type === "Dropdown" ? "la la-chevron-down" : 
-                                                                        q.type === "Multiple Choice" ? "la la-check-square" : 
-                                                                        q.type === "Range" ? "la la-arrows-alt-h" :
-                                                                        "la la-font"
-                                                                    }></i>
-                                                                    {q.type}
-                                                                </span>
                                                             </div>
                                                             <div style={{ display: "flex", gap: 4 }}>
                                                                 <button
@@ -862,7 +918,7 @@ export default function ReviewCareerForm({
                                                         </div>
                                                         
                                                         {(q.type === "Dropdown" || q.type === "Multiple Choice") && q.options && q.options.length > 0 && (
-                                                            <div style={{ marginTop: 8, paddingLeft: 12 }}>
+                                                            <div style={{ marginTop: 8, paddingLeft: 28 }}>
                                                                 {q.options.map((option, optIndex) => (
                                                                     <div key={optIndex} style={{ fontSize: 13, color: "#6c757d", marginBottom: 2 }}>
                                                                         • {option}
@@ -872,7 +928,7 @@ export default function ReviewCareerForm({
                                                         )}
 
                                                         {q.type === "Range" && (
-                                                            <div style={{ marginTop: 8, fontSize: 13, color: "#6c757d" }}>
+                                                            <div style={{ marginTop: 8, paddingLeft: 28, fontSize: 13, color: "#6c757d" }}>
                                                                 Range: {q.minValue || "0"} to {q.maxValue || "∞"}
                                                                 {q.rangeUnit && ` (${q.rangeUnit})`}
                                                             </div>

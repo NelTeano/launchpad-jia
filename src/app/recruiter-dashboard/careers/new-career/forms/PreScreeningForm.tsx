@@ -366,10 +366,8 @@ export default function PreScreeningForm({
             <div style={{ width: "60%", display: "flex", flexDirection: "column", gap: 8 }}>
                     <div className="layered-card-middle">
                         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}>
-                            <div style={{ width: 32, height: 32, backgroundColor: "#181D27", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <i className="la la-file-alt" style={{ color: "#FFFFFF", fontSize: 20 }}></i>
-                            </div>
-                            <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>1. CV Review Settings</span>
+                            <span style={{fontSize: 16, color: "#181D27", fontWeight: 700, marginLeft: 8}}>1. </span>
+                            <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>CV Review Settings</span>
                         </div>
                         <div className="layered-card-content">
                             <div>
@@ -408,10 +406,8 @@ export default function PreScreeningForm({
                     <div className="layered-card-middle" data-error={!!validationErrors.preScreeningQuestions}>
                         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <div style={{ width: 32, height: 32, backgroundColor: "#181D27", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                    <i className="la la-question-circle" style={{ color: "#FFFFFF", fontSize: 20 }}></i>
-                                </div>
-                                <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>2. Pre-Screening Questions</span>
+                                <span style={{fontSize: 16, color: "#181D27", fontWeight: 700, marginLeft: 8}}>2. </span>
+                                <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>Pre-Screening Questions</span>
                                 <div style={{
                                     backgroundColor: "#E9EAEB",
                                     borderRadius: "50%",
