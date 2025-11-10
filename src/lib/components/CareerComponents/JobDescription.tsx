@@ -208,6 +208,62 @@ export default function JobDescription({ formData, setFormData, editModal, isEdi
                                         </div>
                                     </>
                                 )}
+
+                                {/* Pre-Screening Questions Display */}
+                                {formData.preScreeningQuestions && formData.preScreeningQuestions.length > 0 && (
+                                    <>
+                                        <div style={{ height: "1px", width: "100%", background: "#E9EAEB", margin: "16px 0" }}></div>
+                                        <div>
+                                            <span style={{ fontSize: 14, color: "#6c757d", display: "block", marginBottom: 8 }}>Pre-Screening Questions ({formData.preScreeningQuestions.length})</span>
+                                            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                                {formData.preScreeningQuestions.map((q, index) => (
+                                                    <div key={index} style={{
+                                                        padding: "12px",
+                                                        backgroundColor: "#F8F9FA",
+                                                        borderRadius: 8,
+                                                        border: "1px solid #E9EAEB"
+                                                    }}>
+                                                        <div style={{ fontSize: 14, fontWeight: 600, color: "#181D27", marginBottom: 6 }}>
+                                                            {index + 1}. {q.question}
+                                                        </div>
+                                                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                                                            <span style={{
+                                                                fontSize: 12,
+                                                                color: "#6c757d",
+                                                                padding: "2px 8px",
+                                                                backgroundColor: "#fff",
+                                                                borderRadius: 4
+                                                            }}>
+                                                                {q.questionFormat || q.type}
+                                                            </span>
+                                                            {q.questionType && (
+                                                                <span style={{
+                                                                    fontSize: 12,
+                                                                    color: "#5E72E4",
+                                                                    padding: "2px 8px",
+                                                                    backgroundColor: "#E8EAFD",
+                                                                    borderRadius: 4
+                                                                }}>
+                                                                    {q.questionType}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {q.answers && q.answers.length > 0 && (
+                                                            <div style={{ fontSize: 13, color: "#6c757d" }}>
+                                                                <strong>Options:</strong> {q.answers.map(a => a.value).join(", ")}
+                                                            </div>
+                                                        )}
+                                                        {q.minValue && q.maxValue && (
+                                                            <div style={{ fontSize: 13, color: "#6c757d" }}>
+                                                                <strong>Range:</strong> {q.minValue} - {q.maxValue} {q.rangeUnit || ""}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -345,18 +401,22 @@ export default function JobDescription({ formData, setFormData, editModal, isEdi
                                 <strong>Salary:</strong> 
                                 <span>{formData.salaryNegotiable ? "Negotiable" : "Fixed"}</span>
                             </div>
-                            <div style={{ display: "flex",flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%"}}>
-                                <strong>Minimum Salary:</strong> 
-                                <span>{formData.minimumSalary || "-"}</span>
-                            </div>
-                            <div style={{ display: "flex",flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%"}}>
-                                <strong>Maximum Salary:</strong> 
-                                <span>{formData.maximumSalary || "-"}</span>
-                            </div>
+                            {!formData.salaryNegotiable && (
+                                <>
+                                    <div style={{ display: "flex",flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%"}}>
+                                        <strong>Minimum Salary:</strong> 
+                                        <span>₱{formData.minimumSalary?.toLocaleString() || "0"}</span>
+                                    </div>
+                                    <div style={{ display: "flex",flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%"}}>
+                                        <strong>Maximum Salary:</strong> 
+                                        <span>₱{formData.maximumSalary?.toLocaleString() || "0"}</span>
+                                    </div>
+                                </>
+                            )}
                             <div style={{ height: "1px", width: "100%", background: "#E9EAEB", margin: "16px 0" }}></div>
                             <div style={{ display: "flex",flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%"}}>
                                 <strong>Country:</strong> 
-                                <span>Philippines </span>
+                                <span>{formData.country || "Philippines"}</span>
                             </div>
                             <div style={{ display: "flex",flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%"}}>
                                 <strong>State/Province:</strong> 
@@ -453,7 +513,7 @@ export default function JobDescription({ formData, setFormData, editModal, isEdi
                     career={formData} 
                     setShowEditModal={setShowEditModal}
                     user={user}
-                    key={formData._id} // Force re-mount when formData changes
+                    key={formData._id}
                 />
             )}
         </div>
@@ -464,6 +524,7 @@ export default function JobDescription({ formData, setFormData, editModal, isEdi
 function EditCareerModal({ career, setShowEditModal, user }) {
     const [activeEditTab, setActiveEditTab] = useState("career-details");
     const [isSaving, setIsSaving] = useState(false);
+    const [validationErrors, setValidationErrors] = useState({});
 
     // State for Career Details
     const [jobTitle, setJobTitle] = useState(career?.jobTitle || "");
@@ -526,6 +587,51 @@ function EditCareerModal({ career, setShowEditModal, user }) {
         { label: "AI Interview", value: "ai-interview", icon: "microphone" },
     ];
 
+    // Validation function
+    const validateForm = () => {
+        const errors = {};
+
+        // Career Details validation
+        if (!jobTitle.trim()) {
+            errors.jobTitle = "Job title is required";
+        }
+        if (!description.trim()) {
+            errors.description = "Job description is required";
+        }
+        if (!workSetup.trim()) {
+            errors.workSetup = "Work arrangement is required";
+        }
+        if (!city.trim()) {
+            errors.city = "City is required";
+        }
+        if (!salaryNegotiable) {
+            if (!minimumSalary || Number(minimumSalary) <= 0) {
+                errors.minimumSalary = "Minimum salary is required";
+            }
+            if (!maximumSalary || Number(maximumSalary) <= 0) {
+                errors.maximumSalary = "Maximum salary is required";
+            }
+            if (minimumSalary && maximumSalary && Number(minimumSalary) > Number(maximumSalary)) {
+                errors.minimumSalary = "Minimum salary cannot be greater than maximum";
+                errors.maximumSalary = "Maximum salary cannot be less than minimum";
+            }
+        }
+
+        // Pre-screening validation
+        if (preScreeningQuestions.length === 0) {
+            errors.preScreeningQuestions = "At least one pre-screening question is required";
+        }
+
+        // AI Interview validation
+        const totalQuestions = questions.reduce((acc, q) => acc + q.questions.length, 0);
+        if (totalQuestions === 0) {
+            errors.interviewQuestions = "At least one interview question is required";
+        }
+
+        setValidationErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
     // Validation function to check if all required fields are filled
     const isFormValid = () => {
         // Career Details validation
@@ -535,127 +641,146 @@ function EditCareerModal({ career, setShowEditModal, user }) {
         const hasCity = city.trim().length > 0;
         
         // Salary validation
-        const hasSalary = !minimumSalary || !maximumSalary || 
+        const hasSalary = salaryNegotiable || 
             (Number(minimumSalary) > 0 && Number(maximumSalary) > 0 && Number(minimumSalary) <= Number(maximumSalary));
+        
+        // Pre-screening validation
+        const hasPreScreening = preScreeningQuestions.length > 0;
         
         // AI Interview validation - at least one question in any category
         const hasQuestions = questions.some(q => q.questions && q.questions.length > 0);
         
-        return hasJobTitle && hasDescription && hasWorkSetup && hasCity && hasSalary && hasQuestions;
+        return hasJobTitle && hasDescription && hasWorkSetup && hasCity && hasSalary && hasPreScreening && hasQuestions;
     };
 
     const handleSaveChanges = async (saveAsStatus?: "active" | "inactive") => {
         // If trying to publish, validate all fields
-        if (saveAsStatus === "active" && !isFormValid()) {
+        if (saveAsStatus === "active") {
+            if (!validateForm()) {
+                Swal.fire({
+                    icon: "warning",
+                    title: "Incomplete Form",
+                    text: "Please fill in all required fields before publishing.",
+                });
+                
+                // Find first tab with errors and switch to it
+                if (validationErrors.jobTitle || validationErrors.description || validationErrors.workSetup || 
+                    validationErrors.city || validationErrors.minimumSalary || validationErrors.maximumSalary) {
+                    setActiveEditTab("career-details");
+                } else if (validationErrors.preScreeningQuestions) {
+                    setActiveEditTab("cv-review");
+                } else if (validationErrors.interviewQuestions) {
+                    setActiveEditTab("ai-interview");
+                }
+                return;
+            }
+        } else if (saveAsStatus === "inactive") {
+            // For unpublished, just validate current data without forcing completion
+            setValidationErrors({});
+        }
+
+        if (Number(minimumSalary) && Number(maximumSalary) && Number(minimumSalary) > Number(maximumSalary)) {
             Swal.fire({
                 icon: "warning",
-                title: "Incomplete Form",
-                text: "Please fill in all required fields before publishing. Required: Job Title, Description, Work Setup, City, and at least one interview question.",
+                title: "Invalid Salary Range",
+                text: "Minimum salary cannot be greater than maximum salary",
             });
             return;
-        }
-        if (Number(minimumSalary) && Number(maximumSalary) && Number(minimumSalary) > Number(maximumSalary)) {
-        Swal.fire({
-            icon: "warning",
-            title: "Invalid Salary Range",
-            text: "Minimum salary cannot be greater than maximum salary",
-        });
-        return;
         }
 
         setIsSaving(true);
         const statusText = saveAsStatus === "active" ? "Publishing" : saveAsStatus === "inactive" ? "Saving as unpublished" : "Updating";
         
         Swal.fire({
-        title: `${statusText} career...`,
-        text: "Please wait while we update the career...",
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        },
+            title: `${statusText} career...`,
+            text: "Please wait while we update the career...",
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            },
         });
 
         try {
-        // Transform pre-screening questions to match expected format
-        const transformedPreScreeningQuestions = preScreeningQuestions.map((q, index) => {
-            const baseQuestion = {
-            id: String(index + 1),
-            questionType: q.title || "Custom",
-            question: q.question,
-            questionFormat: q.type,
+            // Transform pre-screening questions to match expected format
+            const transformedPreScreeningQuestions = preScreeningQuestions.map((q, index) => {
+                const baseQuestion = {
+                    id: String(index + 1),
+                    questionType: q.title || "Custom",
+                    question: q.question,
+                    questionFormat: q.type,
+                };
+
+                if (q.type === "Dropdown" || q.type === "Multiple Choice") {
+                    baseQuestion.answers = q.options ? q.options.map((opt, optIndex) => ({
+                        id: String(optIndex + 1),
+                        value: opt,
+                        type: q.type
+                    })) : [];
+                }
+
+                if (q.type === "Range") {
+                    baseQuestion.minValue = q.minValue || "0";
+                    baseQuestion.maxValue = q.maxValue || "100";
+                    baseQuestion.rangeUnit = q.rangeUnit || "";
+                }
+
+                return baseQuestion;
+            });
+
+            const userInfoSlice = {
+                image: user.image,
+                name: user.name,
+                email: user.email,
             };
 
-            if (q.type === "Dropdown" || q.type === "Multiple Choice") {
-            baseQuestion.answers = q.options ? q.options.map((opt, optIndex) => ({
-                id: String(optIndex + 1),
-                value: opt,
-                type: q.type
-            })) : [];
+            const updatedData = {
+                _id: career._id,
+                jobTitle,
+                description,
+                workSetup,
+                workSetupRemarks,
+                questions,
+                location: city,
+                country,
+                province,
+                employmentType,
+                salaryNegotiable,
+                minimumSalary: minimumSalary ? Number(minimumSalary) : 0,
+                maximumSalary: maximumSalary ? Number(maximumSalary) : 0,
+                screeningSetting,
+                AIscreeningSetting: interviewScreeningSetting,
+                secretPrompt: secretPrompt || "",
+                preScreeningQuestions: transformedPreScreeningQuestions,
+                requireVideo,
+                orgID: career.orgID,
+                status: saveAsStatus || career.status,
+                lastEditedBy: userInfoSlice,
+                updatedAt: new Date().toISOString(),
+            };
+
+            const response = await axios.post("/api/update-career", updatedData);
+
+            if (response.status === 200) {
+                Swal.fire({
+                    title: "Success",
+                    text: saveAsStatus === "active" ? "Career published successfully" : saveAsStatus === "inactive" ? "Career saved as unpublished" : "Career updated successfully",
+                    icon: "success",
+                    allowOutsideClick: false,
+                }).then(() => {
+                    setShowEditModal(false);
+                    window.location.reload();
+                });
             }
-
-            if (q.type === "Range") {
-            baseQuestion.minValue = q.minValue || "0";
-            baseQuestion.maxValue = q.maxValue || "100";
-            baseQuestion.rangeUnit = q.rangeUnit || "";
-            }
-
-            return baseQuestion;
-        });
-
-        const userInfoSlice = {
-            image: user.image,
-            name: user.name,
-            email: user.email,
-        };
-
-        const updatedData = {
-            _id: career._id,
-            jobTitle,
-            description,
-            workSetup,
-            workSetupRemarks,
-            questions,
-            location: city,
-            country,
-            province,
-            employmentType,
-            salaryNegotiable,
-            minimumSalary: minimumSalary ? Number(minimumSalary) : 0,
-            maximumSalary: maximumSalary ? Number(maximumSalary) : 0,
-            screeningSetting,
-            AIscreeningSetting: interviewScreeningSetting,
-            secretPrompt: secretPrompt || "",
-            preScreeningQuestions: transformedPreScreeningQuestions,
-            requireVideo,
-            orgID: career.orgID,
-            status: saveAsStatus || career.status,
-            lastEditedBy: userInfoSlice,
-            updatedAt: new Date().toISOString(),
-        };
-
-        const response = await axios.post("/api/update-career", updatedData);
-
-        if (response.status === 200) {
-            Swal.fire({
-            title: "Success",
-            text: saveAsStatus === "active" ? "Career published successfully" : saveAsStatus === "inactive" ? "Career saved as unpublished" : "Career updated successfully",
-            icon: "success",
-            allowOutsideClick: false,
-            }).then(() => {
-            setShowEditModal(false);
-            window.location.reload();
-            });
-        }
         } catch (error) {
-        console.error("Error updating career:", error);
-        Swal.fire({
-            title: "Error",
-            text: error.response?.data?.error || "Failed to update career",
-            icon: "error",
-            allowOutsideClick: false,
-        });
+            console.error("Error updating career:", error);
+            Swal.fire({
+                title: "Error",
+                text: error.response?.data?.error || "Failed to update career",
+                icon: "error",
+                allowOutsideClick: false,
+            });
         } finally {
-        setIsSaving(false);
+            setIsSaving(false);
         }
     };
 
@@ -779,6 +904,7 @@ function EditCareerModal({ career, setShowEditModal, user }) {
                                 setMinimumSalary={setMinimumSalary}
                                 maximumSalary={maximumSalary}
                                 setMaximumSalary={setMaximumSalary}
+                                validationErrors={validationErrors}
                             />
                         )}
                         {activeEditTab === "cv-review" && (
@@ -789,6 +915,7 @@ function EditCareerModal({ career, setShowEditModal, user }) {
                                 setSecretPrompt={setSecretPrompt}
                                 preScreeningQuestions={preScreeningQuestions}
                                 setPreScreeningQuestions={setPreScreeningQuestions}
+                                validationErrors={validationErrors}
                             />
                         )}
                         {activeEditTab === "ai-interview" && (
@@ -801,6 +928,7 @@ function EditCareerModal({ career, setShowEditModal, user }) {
                                 setRequireVideo={setRequireVideo}
                                 questions={questions}
                                 setQuestions={setQuestions}
+                                validationErrors={validationErrors}
                             />
                         )}
                     </div>

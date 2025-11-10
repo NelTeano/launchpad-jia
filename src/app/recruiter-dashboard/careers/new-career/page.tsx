@@ -230,36 +230,44 @@ export default function NewCareerPage() {
     return careerData;
   };
 
-  const saveCareerData = async (status: string, showSuccessMessage = true) => {
-    // Validate all steps before saving
-    const currentStepBackup = currentStep;
-    let allValid = true;
+  const saveCareerData = async (status: string, validateAll = false) => {
+    setIsSaving(true);
+    
+    try {
+      // If validateAll is true, validate all steps
+      if (validateAll) {
+        const currentStepBackup = currentStep;
+        let allValid = true;
 
-    // Validate each step
-    for (const step of steps) {
-      setCurrentStep(step);
-      if (!validateCurrentStep()) {
-        allValid = false;
-        if (step === currentStepBackup) {
-          // Stay on current step if it has errors
-          break;
-        } else {
-          // Move to first step with errors
-          alert(`Please complete all required fields in "${step}" before saving.`);
+        // Validate each step
+        for (const step of steps) {
+          setCurrentStep(step);
+          if (!validateCurrentStep()) {
+            allValid = false;
+            if (step === currentStepBackup) {
+              // Stay on current step if it has errors
+              break;
+            } else {
+              // Move to first step with errors
+              alert(`Please complete all required fields in "${step}" before saving.`);
+              return false;
+            }
+          }
+        }
+
+        // Restore current step
+        setCurrentStep(currentStepBackup);
+
+        if (!allValid) {
+          return false;
+        }
+      } else {
+        // Only validate current step
+        if (!validateCurrentStep()) {
           return false;
         }
       }
-    }
 
-    // Restore current step
-    setCurrentStep(currentStepBackup);
-
-    if (!allValid) {
-      return false;
-    }
-
-    setIsSaving(true);
-    try {
       const careerData = prepareCareerData(status);
       
       const response = await fetch("/api/update-career", {
@@ -282,7 +290,6 @@ export default function NewCareerPage() {
         setCareerId(result.career._id);
       }
 
-      
       return true;
     } catch (error: any) {
       console.error("Error saving career:", error);
@@ -318,7 +325,11 @@ export default function NewCareerPage() {
   };
 
   const handleSaveAsUnpublished = async () => {
-    await saveCareerData("inactive", true);
+    const saved = await saveCareerData("inactive", false);
+    if (saved) {
+      // Redirect to careers page after successful save
+      window.location.href = "/recruiter-dashboard/careers";
+    }
   };
 
   const handlePublish = async () => {

@@ -112,6 +112,19 @@ export default function PreScreeningForm({
         setPreScreeningQuestions(preScreeningQuestions.filter(q => q.id !== id));
     };
 
+    // Handle reordering questions via drag and drop
+    const handleReorderQuestions = (draggedQuestionId: number, insertIndex: number) => {
+        const updatedQuestions = [...preScreeningQuestions];
+        const draggedIndex = updatedQuestions.findIndex(q => q.id === draggedQuestionId);
+        
+        if (draggedIndex === -1) return;
+        
+        const [draggedQuestion] = updatedQuestions.splice(draggedIndex, 1);
+        updatedQuestions.splice(insertIndex, 0, draggedQuestion);
+        
+        setPreScreeningQuestions(updatedQuestions);
+    };
+
     const CustomQuestionModal = () => {
         const [questionText, setQuestionText] = useState(editingQuestion?.question || "");
         const [questionType, setQuestionType] = useState(editingQuestion?.type || "Text");
@@ -491,36 +504,81 @@ export default function PreScreeningForm({
                             ) : (
                                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                                     {preScreeningQuestions.map((q, index) => (
-                                        <div key={q.id} style={{
-                                            padding: 16,
-                                            border: "1px solid #E9EAEB",
-                                            borderRadius: 8,
-                                            backgroundColor: "#F8F9FA"
-                                        }}>
+                                        <div 
+                                            key={q.id} 
+                                            style={{
+                                                padding: 16,
+                                                border: "1px solid #E9EAEB",
+                                                borderRadius: 8,
+                                                backgroundColor: "#F8F9FA",
+                                                cursor: "move"
+                                            }}
+                                            draggable={true}
+                                            onDragStart={(e) => {
+                                                e.dataTransfer.setData("questionId", q.id.toString());
+                                            }}
+                                            onDragOver={(e) => {
+                                                e.preventDefault();
+                                                const target = e.currentTarget;
+                                                const bounding = target.getBoundingClientRect();
+                                                const offset = bounding.y + bounding.height / 2;
+
+                                                if (e.clientY - offset > 0) {
+                                                    target.style.borderBottom = "2px solid";
+                                                    target.style.borderImage = "linear-gradient(90deg, #9fcaed 0%, #ceb6da 33%, #ebacc9 66%, #fccec0 100%) 1";
+                                                    target.style.borderTop = "none";
+                                                } else {
+                                                    target.style.borderTop = "2px solid";
+                                                    target.style.borderImage = "linear-gradient(90deg, #9fcaed 0%, #ceb6da 33%, #ebacc9 66%, #fccec0 100%) 1";
+                                                    target.style.borderBottom = "none";
+                                                }
+                                            }}
+                                            onDragLeave={(e) => {
+                                                e.currentTarget.style.borderTop = "none";
+                                                e.currentTarget.style.borderBottom = "none";
+                                            }}
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                e.currentTarget.style.borderTop = "none";
+                                                e.currentTarget.style.borderBottom = "none";
+
+                                                const draggedQuestionId = Number(e.dataTransfer.getData("questionId"));
+                                                if (!isNaN(draggedQuestionId) && draggedQuestionId !== q.id) {
+                                                    const bounding = e.currentTarget.getBoundingClientRect();
+                                                    const offset = bounding.y + bounding.height / 2;
+                                                    const insertIndex = e.clientY - offset > 0 ? index + 1 : index;
+                                                    
+                                                    handleReorderQuestions(draggedQuestionId, insertIndex);
+                                                }
+                                            }}
+                                        >
                                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ fontSize: 14, fontWeight: 600, color: "#181D27", marginBottom: 8 }}>
-                                                        {q.question}
-                                                    </div>
-                                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                                        <span style={{
-                                                            fontSize: 12,
-                                                            color: "#6c757d",
-                                                            padding: "2px 8px",
-                                                            backgroundColor: "#fff",
-                                                            borderRadius: 4,
-                                                            display: "flex",
-                                                            alignItems: "center",
-                                                            gap: 4
-                                                        }}>
-                                                            <i className={
-                                                                q.type === "Dropdown" ? "la la-chevron-down" : 
-                                                                q.type === "Multiple Choice" ? "la la-check-square" : 
-                                                                q.type === "Range" ? "la la-arrows-alt-h" :
-                                                                "la la-font"
-                                                            }></i>
-                                                            {q.type}
-                                                        </span>
+                                                <div style={{ flex: 1, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                                                    <i className="la la-grip-vertical" style={{ fontSize: 20, color: "#A4A7AE", marginTop: 2 }}></i>
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontSize: 14, fontWeight: 600, color: "#181D27", marginBottom: 8 }}>
+                                                            {q.question}
+                                                        </div>
+                                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                                            <span style={{
+                                                                fontSize: 12,
+                                                                color: "#6c757d",
+                                                                padding: "2px 8px",
+                                                                backgroundColor: "#fff",
+                                                                borderRadius: 4,
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                gap: 4
+                                                            }}>
+                                                                <i className={
+                                                                    q.type === "Dropdown" ? "la la-chevron-down" : 
+                                                                    q.type === "Multiple Choice" ? "la la-check-square" : 
+                                                                    q.type === "Range" ? "la la-arrows-alt-h" :
+                                                                    "la la-font"
+                                                                }></i>
+                                                                {q.type}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <button
@@ -660,6 +718,12 @@ export default function PreScreeningForm({
                                 <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>Use "Good Fit and above" </span>
                                 <span>
                                     for a broader talent pool, or "Only Strong Fit" to focus on the most qualified candidates only.
+                                </span>
+                            </div>
+                            <div>
+                                <span style={{fontSize: 16, color: "#181D27", fontWeight: 700}}>Drag to Reorder </span>
+                                <span>
+                                    questions by clicking and holding on the grip icon, then dragging them to your preferred position.
                                 </span>
                             </div>
                         </div>
