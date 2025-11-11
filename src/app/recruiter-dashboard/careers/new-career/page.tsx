@@ -413,7 +413,21 @@ export default function NewCareerPage() {
         <div className={styles.stepContainer}>
           <div className={styles.step}>
             {steps.map((_, index) => (
-              <div className={styles.stepBar} key={index}>
+              <div 
+                className={styles.stepBar} 
+                key={index}
+                onClick={() => {
+                  const currentStepIndex = steps.indexOf(currentStep);
+                  // Only allow clicking on completed steps or current step
+                  if (index <= currentStepIndex) {
+                    setCurrentStep(steps[index]);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                }}
+                style={{ 
+                  cursor: index <= steps.indexOf(currentStep) ? 'pointer' : 'default'
+                }}
+              >
                 <img
                   alt=""
                   src={
@@ -446,12 +460,24 @@ export default function NewCareerPage() {
                   ]
                 }`}
                 key={index}
+                onClick={() => {
+                  const currentStepIndex = steps.indexOf(currentStep);
+                  // Only allow clicking on completed steps or current step
+                  if (index <= currentStepIndex) {
+                    setCurrentStep(steps[index]);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                }}
+                style={{ 
+                  cursor: index <= steps.indexOf(currentStep) ? 'pointer' : 'default'
+                }}
               >
                 {item}
               </span>
             ))}
           </div>
         </div>
+
 
         <div className="mt-4">
           {currentStep === "Career Details and Team Access" && (
