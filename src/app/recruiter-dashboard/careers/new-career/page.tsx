@@ -129,11 +129,10 @@ export default function NewCareerPage() {
       }
     }
 
-    if (currentStep === "CV Review and Pre-Screening") {
-      if (preScreeningQuestions.length === 0) {
-        errors.preScreeningQuestions = "At least one pre-screening question is required";
-      }
-    }
+    // Pre-screening questions are now optional - no validation needed
+    // if (currentStep === "CV Review and Pre-Screening") {
+    //   // No validation - questions are optional
+    // }
 
     if (currentStep === "AI-Interview Setup") {
       const totalQuestions = questions.reduce((acc, q) => acc + q.questions.length, 0);

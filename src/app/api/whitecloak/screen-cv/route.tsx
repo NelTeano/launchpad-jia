@@ -135,114 +135,98 @@ export async function POST(request: Request) {
   const forDropResult = ["No Fit", "Bad Fit"];
   const forPromotionResult = ["Good Fit", "Strong Fit"];
 
+  // Determine if candidate passes screening based on settings
+  let passesScreening = false;
+  
+  if (interviewData.screeningSetting === "Only Strong Fit") {
+    passesScreening = result.result === "Strong Fit";
+  } else if (interviewData.screeningSetting === "Good Fit and above") {
+    passesScreening = result.result === "Good Fit" || result.result === "Strong Fit";
+  } else {
+    // No specific setting, use default logic
+    passesScreening = forPromotionResult.includes(result.result);
+  }
+
+  // Handle review cases
   if (forReviewResult.includes(result.result)) {
     screeningData.currentStep = "CV Screening";
     screeningData.status = "For CV Screening";
-  }
-
-  if (forDropResult.includes(result.result)) {
-    screeningData.applicationStatus = "Dropped";
-    interviewTransaction = {
-      interviewUID: interviewData._id.toString(),
-      fromStage: "CV Screening",
-      action: "Dropped",
-      updatedBy: {
-        name: "Jia",
-      },
-    };
-    screeningData.applicationMetadata = {
-      updatedAt: Date.now(),
-      updatedBy: {
-        name: "Jia",
-      },
-      action: "Dropped",
-    };
-  }
-
-  if (forPromotionResult.includes(result.result)) {
-    screeningData.currentStep = "CV Screening";
-    screeningData.status = "For AI Interview";
-    screeningData.statusDate = {
-      ...screeningData.statusDate,
-      "AI Interview": newDate,
-    };
-    interviewTransaction = {
-      interviewUID: interviewData._id.toString(),
-      fromStage: "CV Screening",
-      toStage: "Pending AI Interview",
-      action: "Auto-Promoted",
-      updatedBy: {
-        name: "Jia",
-      },
-    };
-    screeningData.applicationMetadata = {
-      updatedAt: Date.now(),
-      updatedBy: {
-        name: "Jia",
-      },
-      action: "Endorsed",
-    };
-  }
-
-  if (interviewData.screeningSetting) {
-    if (interviewData.screeningSetting === "Only Strong Fit") {
-      if (result.result == forPromotionResult[0]) {
-        screeningData.status = "For CV Screening";
-      }
-    }
-  }
-
-  if (result.result === "No Fit" || result.result === "Bad Fit") {
     screeningData.stateClass = "state-rejected";
     screeningData.cvSettingResult = "Failed";
   }
 
-  // manage state class
-  if (result.result === "Good Fit") {
-    screeningData.stateClass = "state-good";
-    screeningData.cvSettingResult = "Passed";
+  // Handle drop cases
+  if (forDropResult.includes(result.result)) {
+    screeningData.applicationStatus = "Dropped";
+    screeningData.stateClass = "state-rejected";
+    screeningData.cvSettingResult = "Failed";
+    interviewTransaction = {
+      interviewUID: interviewData._id.toString(),
+      fromStage: "CV Screening",
+      action: "Dropped",
+      updatedBy: {
+        name: "Jia",
+      },
+    };
+    screeningData.applicationMetadata = {
+      updatedAt: Date.now(),
+      updatedBy: {
+        name: "Jia",
+      },
+      action: "Dropped",
+    };
   }
 
-  if (result.result === "Strong Fit") {
-    screeningData.stateClass = "state-accepted";
-    screeningData.cvSettingResult = "Passed";
+  // Handle promotion cases based on screening setting
+  if (forPromotionResult.includes(result.result)) {
+    if (passesScreening) {
+      // Candidate passes the screening criteria
+      screeningData.currentStep = "CV Screening";
+      screeningData.status = "For AI Interview";
+      screeningData.statusDate = {
+        ...screeningData.statusDate,
+        "AI Interview": newDate,
+      };
+      interviewTransaction = {
+        interviewUID: interviewData._id.toString(),
+        fromStage: "CV Screening",
+        toStage: "Pending AI Interview",
+        action: "Auto-Promoted",
+        updatedBy: {
+          name: "Jia",
+        },
+      };
+      screeningData.applicationMetadata = {
+        updatedAt: Date.now(),
+        updatedBy: {
+          name: "Jia",
+        },
+        action: "Endorsed",
+      };
+      
+      // Set state class based on result
+      if (result.result === "Good Fit") {
+        screeningData.stateClass = "state-good";
+      } else if (result.result === "Strong Fit") {
+        screeningData.stateClass = "state-accepted";
+      }
+      screeningData.cvSettingResult = "Passed";
+    } else {
+      // Candidate doesn't meet the screening criteria
+      screeningData.currentStep = "CV Screening";
+      screeningData.status = "For CV Screening";
+      screeningData.stateClass = "state-rejected";
+      screeningData.cvSettingResult = "Failed";
+    }
   }
 
+  // Handle ineligible or insufficient data cases
   if (
     result.result === "Ineligible CV" ||
     result.result === "Insufficient Data"
   ) {
     screeningData.stateClass = "state-rejected";
     screeningData.cvSettingResult = "Failed";
-  }
-
-  // check screening setting
-  if (interviewData.screeningSetting) {
-    if (interviewData.screeningSetting === "Only Strong Fit") {
-      if (result.result === "Strong Fit") {
-        screeningData.stateClass = "state-accepted";
-        screeningData.cvSettingResult = "Passed";
-        // screeningData.currentStep = "AI Interview";
-        // screeningData.status = "For Interview";
-      } else {
-        screeningData.stateClass = "state-rejected";
-        screeningData.cvSettingResult = "Failed";
-        // screeningData.status = "Failed CV Screening";
-      }
-    }
-
-    if (interviewData.screeningSetting === "Good Fit and above") {
-      if (result.result === "Good Fit" || result.result === "Strong Fit") {
-        screeningData.stateClass = "state-accepted";
-        screeningData.cvSettingResult = "Passed";
-        // screeningData.currentStep = "AI Interview";
-        // screeningData.status = "For Interview";
-      } else {
-        screeningData.stateClass = "state-rejected";
-        screeningData.cvSettingResult = "Failed";
-        // screeningData.status = "Failed CV Screening";
-      }
-    }
   }
 
   await db
@@ -255,6 +239,7 @@ export async function POST(request: Request) {
       createdAt: Date.now(),
     });
   }
+  
   // Update career lastActivityAt to current date
   await db
     .collection("careers")

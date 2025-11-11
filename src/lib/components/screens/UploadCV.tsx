@@ -1,5 +1,5 @@
 // TODO (Job Portal) - Check API
-// Upload CV Component with Pre-Screening Questions and AI Screening
+// Upload CV Component with Pre-Screening Questions (3 Steps)
 "use client";
 
 import Loader from "@/lib/components/commonV2/Loader";
@@ -26,7 +26,7 @@ export default function UploadCVWithPreScreening() {
   const [screeningResult, setScreeningResult] = useState(null);
   const [userCV, setUserCV] = useState(null);
   const [preScreeningAnswers, setPreScreeningAnswers] = useState({});
-  const [aiScreeningResult, setAiScreeningResult] = useState(null);
+  const [screeningLoading, setScreeningLoading] = useState(false);
   
   const cvSections = [
     "Introduction",
@@ -42,10 +42,8 @@ export default function UploadCVWithPreScreening() {
   
   const step = [
     "Submit CV",
-    "CV Screening",
     "Pre-Screening Questions",
-    "AI Screening",
-    "Review Next Steps"
+    "Review"
   ];
   const stepStatus = ["Completed", "Pending", "In Progress"];
 
@@ -216,10 +214,10 @@ export default function UploadCVWithPreScreening() {
   }
 
   // ============================================
-  // API CALLS - Screening & Submission
+  // API CALLS - CV Submission (Step 1 -> Step 2)
   // ============================================
 
-  async function handleCVScreen() {
+  function handleCVScreen() {
     if (editingCV != null) {
       alert("Please save the changes first.");
       return false;
@@ -230,7 +228,7 @@ export default function UploadCVWithPreScreening() {
     );
 
     if (allEmpty) {
-      alert("No details to be save.");
+      alert("No details to be saved.");
       return false;
     }
 
@@ -251,8 +249,7 @@ export default function UploadCVWithPreScreening() {
       }
     }
 
-    setCurrentStep(step[1]);
-
+    // Save CV and move to Pre-Screening Questions (no AI screening yet)
     if (hasChanges) {
       const formattedUserCV = cvSections.map((section) => ({
         name: section,
@@ -276,7 +273,7 @@ export default function UploadCVWithPreScreening() {
         };
       }
 
-      await axios({
+      axios({
         method: "POST",
         url: `/api/whitecloak/save-cv`,
         data,
@@ -286,74 +283,61 @@ export default function UploadCVWithPreScreening() {
             "userCV",
             JSON.stringify({ ...data, ...data.cvData })
           );
-        })
-        .catch((err) => {
-          alert("Error saving CV. Please try again.");
-          setCurrentStep(step[0]);
-          console.log(err);
-        });
-    }
-
-    setHasChanges(true);
-
-    await axios({
-      url: "/api/whitecloak/screen-cv",
-      method: "POST",
-      data: {
-        interviewID: interview.interviewID,
-        userEmail: user.email,
-      },
-    })
-      .then((res) => {
-        const result = res.data;
-
-        if (result.error) {
-          alert(result.message);
-          setCurrentStep(step[0]);
-        } else {
-          setScreeningResult(result);
           
           // Check if there are pre-screening questions
           if (interview.preScreeningQuestions && interview.preScreeningQuestions.length > 0) {
-            setCurrentStep(step[2]); // Move to Pre-Screening Questions
+            setCurrentStep(step[1]); // Move to Pre-Screening Questions
           } else {
-            setCurrentStep(step[4]); // Skip to Review Next Steps
+            // No pre-screening questions, go directly to AI screening
+            handleSubmitPreScreening();
           }
-        }
-      })
-      .catch((err) => {
-        alert("Error screening CV. Please try again.");
-        setCurrentStep(step[0]);
-        console.log(err);
-      })
-      .finally(() => {
-        setHasChanges(false);
-      });
-  }
-
-  async function handleSubmitPreScreening() {
-    // Validate all questions are answered
-    const unanswered = interview.preScreeningQuestions.filter(q => {
-      const answer = preScreeningAnswers[q.id];
-      return !answer || (Array.isArray(answer) && answer.length === 0) || answer === "";
-    });
-
-    if (unanswered.length > 0) {
-      alert("Please answer all questions before proceeding.");
-      return;
+        })
+        .catch((err) => {
+          alert("Error saving CV. Please try again.");
+          console.log(err);
+        });
+    } else {
+      // No changes, just move to next step
+      if (interview.preScreeningQuestions && interview.preScreeningQuestions.length > 0) {
+        setCurrentStep(step[1]);
+      } else {
+        handleSubmitPreScreening();
+      }
     }
 
-    setCurrentStep(step[3]); // Move to AI Screening
+    setHasChanges(false);
+  }
 
-    // Call AI screening API
+  // ============================================
+  // API CALLS - Pre-Screening Submission + AI Screening
+  // ============================================
+
+  async function handleSubmitPreScreening() {
+    // Validate all questions are answered (if pre-screening questions exist)
+    if (interview.preScreeningQuestions && interview.preScreeningQuestions.length > 0) {
+      const unanswered = interview.preScreeningQuestions.filter(q => {
+        const answer = preScreeningAnswers[q.id];
+        return !answer || (Array.isArray(answer) && answer.length === 0) || answer === "";
+      });
+
+      if (unanswered.length > 0) {
+        alert("Please answer all questions before proceeding.");
+        return;
+      }
+    }
+
+    setScreeningLoading(true);
+    setCurrentStep(step[2]); // Move to Review (with loading state)
+
+    // Call AI screening API (screen-cv route)
     try {
       const response = await axios({
         method: "POST",
-        url: "/api/whitecloak/ai-screening",
+        url: "/api/whitecloak/screen-cv",
         data: {
           interviewID: interview.interviewID,
           userEmail: user.email,
-          preScreeningAnswers: preScreeningAnswers
+          preScreeningAnswers: preScreeningAnswers // Pass answers to backend
         }
       });
 
@@ -361,16 +345,17 @@ export default function UploadCVWithPreScreening() {
       
       if (result.error) {
         alert(result.message);
-        setCurrentStep(step[2]);
+        setCurrentStep(step[1]);
         return;
       }
 
-      setAiScreeningResult(result);
-      setCurrentStep(step[4]); // Move to Review Next Steps
+      setScreeningResult(result);
     } catch (error) {
-      console.error("AI Screening error:", error);
-      alert("Error during AI screening. Please try again.");
-      setCurrentStep(step[2]);
+      console.error("CV Screening error:", error);
+      alert("Error during CV screening. Please try again.");
+      setCurrentStep(step[1]);
+    } finally {
+      setScreeningLoading(false);
     }
   }
 
@@ -840,22 +825,8 @@ export default function UploadCVWithPreScreening() {
             </>
           )}
 
-          {/* STEP 2: CV Screening */}
-          {currentStep == step[1] && (
-            <div className={styles.cvScreeningContainer}>
-              <img alt="" src={assetConstants.loading} />
-              <span className={styles.title}>Sit tight!</span>
-              <span className={styles.description}>
-                Our smart reviewer is checking your qualifications.
-              </span>
-              <span className={styles.description}>
-                We'll let you know what's next in just a moment.
-              </span>
-            </div>
-          )}
-
-          {/* STEP 3: Pre-Screening Questions */}
-          {currentStep == step[2] && interview.preScreeningQuestions && (
+          {/* STEP 2: Pre-Screening Questions */}
+          {currentStep == step[1] && interview.preScreeningQuestions && (
             <div className={styles.cvDetailsContainer}>
               <div className={styles.gradient}>
                 <div className={styles.cvDetailsCard}>
@@ -891,92 +862,98 @@ export default function UploadCVWithPreScreening() {
             </div>
           )}
 
-          {/* STEP 4: AI Screening */}
-          {currentStep == step[3] && (
-            <div className={styles.cvScreeningContainer}>
-              <img alt="" src={assetConstants.loading} />
-              <span className={styles.title}>Analyzing your responses!</span>
-              <span className={styles.description}>
-                Our AI is evaluating your answers to determine the best fit.
-              </span>
-              <span className={styles.description}>
-                This will only take a moment.
-              </span>
-            </div>
-          )}
-
-          {/* STEP 5: Review Next Steps */}
-          {currentStep == step[4] && (
-            <div className={styles.cvResultContainer}>
-  
-
-              {aiScreeningResult?.status === "For Human Interview" && 
-               aiScreeningResult?.aiSettingResult === "Passed" ? (
-                <>
-                  <img alt="" src={assetConstants.checkV3} />
-                  <span className={styles.title}>
-                    Congratulations! You're a strong match for this role.
+          {/* STEP 3: Review (Loading + Results) */}
+          {currentStep == step[2] && (
+            <>
+              {(screeningLoading || !screeningResult) ? (
+                <div className={styles.cvScreeningContainer}>
+                  <img alt="" src={assetConstants.loading} />
+                  <span className={styles.title}>Sit tight!</span>
+                  <span className={styles.description}>
+                    Our smart reviewer is checking your qualifications.
                   </span>
                   <span className={styles.description}>
-                    Based on your CV and responses, you're an excellent fit for this position.
+                    We'll let you know what's next in just a moment.
                   </span>
-                  <br />
-                  <span className={`${styles.description} ${styles.bold}`}>
-                    Ready to take the next step?
-                  </span>
-                  <span className={styles.description}>
-                    Proceed to the AI interview to continue your application.
-                  </span>
-                  <div className={styles.buttonContainer}>
-                    <button
-                      className="secondaryBtn"
-                      onClick={() => handleRedirection("dashboard")}
-                    >
-                      View Dashboard
-                    </button>
-                  </div>
-                </>
-              ) : 
-              
-              aiScreeningResult?.aiSettingResult === "Failed" ? (
-                <>
-                  <img alt="" src={assetConstants.userRejected} />
-                  <span className={styles.title}>
-                    This role may not be the best match.
-                  </span>
-                  <span className={styles.description}>
-                    Based on your CV and responses, it looks like this position might not be
-                    the right fit at the moment.
-                  </span>
-                  <br />
-                  <span className={styles.description}>
-                    Review your screening results and see recommended next steps.
-                  </span>
-                  <div className={styles.buttonContainer}>
-                    <button onClick={() => handleRedirection("dashboard")}>
-                      View Dashboard
-                    </button>
-                  </div>
-                </>
-              ) : 
-              
-              (
-                <>
-                  <img alt="" src={assetConstants.userCheck} />
-                  <span className={styles.title}>
-                    Your application is now being reviewed by the hiring team.
-                  </span>
-                  <span className={styles.description}>
-                    We'll be in touch soon with updates about your application.
-                  </span>
-                  <div className={styles.buttonContainer}>
-                    <button onClick={() => handleRedirection("dashboard")}>
-                      View Dashboard
-                    </button>
-                  </div>
-                </>
+                </div>
+              ) : (
+                <div className={styles.cvResultContainer}>
+                  {/* Strong Fit -> For AI Interview */}
+                  {screeningResult.status === "For AI Interview" && 
+                   screeningResult.cvSettingResult === "Passed" ? (
+                    <>
+                      <img alt="" src={assetConstants.checkV3} />
+                      <span className={styles.title}>
+                        Congratulations! You're a strong match for this role.
+                      </span>
+                      <span className={styles.description}>
+                        Based on your CV and responses, you're an excellent fit for this position.
+                      </span>
+                      <br />
+                      <span className={`${styles.description} ${styles.bold}`}>
+                        Ready to take the next step?
+                      </span>
+                      <span className={styles.description}>
+                        Proceed to the AI interview to continue your application.
+                      </span>
+                      <div className={styles.buttonContainer}>
+                        <button onClick={() => handleRedirection("interview")}>
+                          Start AI Interview
+                        </button>
+                        <button
+                          className="secondaryBtn"
+                          onClick={() => handleRedirection("dashboard")}
+                        >
+                          View Dashboard
+                        </button>
+                      </div>
+                    </>
+                  ) : 
+                  
+                  /* Failed -> Dropped */
+                  screeningResult.applicationStatus === "Dropped" ||
+                  screeningResult.cvSettingResult === "Failed" ? (
+                    <>
+                      <img alt="" src={assetConstants.userRejected} />
+                      <span className={styles.title}>
+                        This role may not be the best match.
+                      </span>
+                      <span className={styles.description}>
+                        Based on your CV and responses, it looks like this position might not be
+                        the right fit at the moment.
+                      </span>
+                      <br />
+                      <span className={styles.description}>
+                        Review your screening results and see recommended next steps.
+                      </span>
+                      <div className={styles.buttonContainer}>
+                        <button onClick={() => handleRedirection("dashboard")}>
+                          View Dashboard
+                        </button>
+                      </div>
+                    </>
+                  ) : 
+                  
+                  /* For CV Screening / Pending Review by HR */
+                  (
+                    <>
+                      <img alt="" src={assetConstants.userCheck} />
+                      <span className={styles.title}>
+                        Your application is now being reviewed by the hiring team.
+                      </span>
+                      <span className={styles.description}>
+                        We'll be in touch soon with updates about your application.
+                      </span>
+                      <div className={styles.buttonContainer}>
+                        <button onClick={() => handleRedirection("dashboard")}>
+                          View Dashboard
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
       )}
